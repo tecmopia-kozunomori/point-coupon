@@ -1,12 +1,13 @@
 "use strict";
 
-const APP_BUILD = "2026.07.24-GAS-ADMIN-04";
+const APP_BUILD = "2026.07.24-GAS-ADMIN-05";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
 
 const DEVICE_ID_KEY = "tecmopia_device_id_v1";
 const RESET_VERSION_KEY = "tecmopia_reset_version_v1";
+const PAGE_VIEW_DATE_KEY = "tecmopia_page_view_date_v1";
 const GAS_WEB_APP_URL = String(window.TECMOPIA_GAS_URL || "").trim();
 const GAS_PLACEHOLDER = "PASTE_GAS_WEB_APP_URL_HERE";
 const GAS_ENABLED = /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(?:\?.*)?$/i.test(GAS_WEB_APP_URL)
@@ -29,6 +30,33 @@ function getDeviceId() {
 
 function makeEventId(prefix = "event") {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function logDailyPageView() {
+  if (!GAS_ENABLED) return;
+
+  const today = getTodayKey();
+
+  try {
+    if (localStorage.getItem(PAGE_VIEW_DATE_KEY) === today) return;
+  } catch (error) {
+    console.warn("起動記録の確認に失敗しました。", error);
+  }
+
+  const sent = sendGasEvent("page_view", {
+    itemId: "APP_OPEN",
+    itemName: "ポイントカードを開く",
+    points: 0,
+    balance: state.points
+  });
+
+  if (sent) {
+    try {
+      localStorage.setItem(PAGE_VIEW_DATE_KEY, today);
+    } catch (error) {
+      console.warn("起動記録の保存に失敗しました。", error);
+    }
+  }
 }
 
 function appendQuery(url, params) {
@@ -1199,6 +1227,7 @@ function init() {
   initEvents();
   renderAll();
   processQrAccess();
+  logDailyPageView();
   checkRemoteReset({ showNotice: true });
   setInterval(() => checkRemoteReset(), 5 * 60 * 1000);
 }
