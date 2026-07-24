@@ -19,7 +19,7 @@
         if (validTokens.includes(normalized)) {
           sessionStorage.setItem("tecmopia_pending_earn_v2", JSON.stringify({
             token: normalized,
-            expiresAt: Date.now() + 3 * 60 * 1000
+            expiresAt: Date.now() + 5 * 60 * 1000
           }));
         } else {
           sessionStorage.setItem("tecmopia_invalid_earn_v2", "1");
@@ -32,7 +32,7 @@
   </script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
   <script src="gas-config.js"></script>
-  <script src="./app.js?v=20260724-indoor03" defer></script>
+  <script src="./app.js?v=20260724-gas04" defer></script>
 </head>
 <body>
   <div class="page-sky" aria-hidden="true">
@@ -286,6 +286,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <div style="position:fixed;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:20;font:700 9px/1.2 system-ui;color:rgba(0,74,130,.45);pointer-events:none">BUILD INDOOR-03</div>
+  <div style="position:fixed;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:20;font:700 9px/1.2 system-ui;color:rgba(0,74,130,.45);pointer-events:none">BUILD GAS-ADMIN-04</div>
 </body>
 </html>

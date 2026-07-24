@@ -1203,4 +1203,8 @@ function init() {
   setInterval(() => checkRemoteReset(), 5 * 60 * 1000);
 }
 
-document.addEventListener("DOMContentLoaded", init);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init, { once: true });
+} else {
+  init();
+}
