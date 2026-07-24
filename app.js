@@ -1,8 +1,157 @@
 "use strict";
 
-const APP_BUILD = "2026.07.24-INDOOR-03";
+const APP_BUILD = "2026.07.24-GAS-ADMIN-04";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
+
+
+const DEVICE_ID_KEY = "tecmopia_device_id_v1";
+const RESET_VERSION_KEY = "tecmopia_reset_version_v1";
+const GAS_WEB_APP_URL = String(window.TECMOPIA_GAS_URL || "").trim();
+const GAS_PLACEHOLDER = "PASTE_GAS_WEB_APP_URL_HERE";
+const GAS_ENABLED = /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(?:\?.*)?$/i.test(GAS_WEB_APP_URL)
+  && !GAS_WEB_APP_URL.includes(GAS_PLACEHOLDER);
+const GAS_JSONP_TIMEOUT_MS = 10000;
+const gasRequestKeepAlive = new Set();
+
+function getDeviceId() {
+  try {
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+      id = `tp_${Date.now().toString(36)}_${window.crypto?.randomUUID?.() || Math.random().toString(36).slice(2, 14)}`;
+      localStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+  } catch (error) {
+    return `tp_session_${Math.random().toString(36).slice(2, 14)}`;
+  }
+}
+
+function makeEventId(prefix = "event") {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function appendQuery(url, params) {
+  const target = new URL(url);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    target.searchParams.set(key, String(value));
+  });
+  target.searchParams.set("_", String(Date.now()));
+  return target.toString();
+}
+
+function sendGasEvent(eventType, payload = {}) {
+  if (!GAS_ENABLED) return false;
+  const eventId = payload.eventId || makeEventId(eventType);
+  const params = {
+    action: "log",
+    eventId,
+    deviceId: getDeviceId(),
+    eventType,
+    itemId: payload.itemId,
+    itemName: payload.itemName,
+    points: payload.points,
+    balance: payload.balance,
+    couponInstanceId: payload.couponInstanceId,
+    distance: payload.distance,
+    accuracy: payload.accuracy,
+    locationMode: payload.locationMode,
+    clientAt: new Date().toISOString(),
+    appBuild: APP_BUILD,
+    pageUrl: `${location.origin}${location.pathname}`,
+    userAgent: navigator.userAgent.slice(0, 240)
+  };
+  const image = new Image();
+  gasRequestKeepAlive.add(image);
+  const release = () => {
+    gasRequestKeepAlive.delete(image);
+    image.onload = null;
+    image.onerror = null;
+  };
+  image.onload = release;
+  image.onerror = release;
+  image.src = appendQuery(GAS_WEB_APP_URL, params);
+  setTimeout(release, 15000);
+  return true;
+}
+
+function gasJsonp(action, params = {}) {
+  return new Promise((resolve, reject) => {
+    if (!GAS_ENABLED) {
+      reject(new Error("GAS_URL_NOT_CONFIGURED"));
+      return;
+    }
+    const callbackName = `__tecmopiaGas_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const script = document.createElement("script");
+    let settled = false;
+    const cleanup = () => {
+      delete window[callbackName];
+      script.remove();
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("GAS_TIMEOUT"));
+    }, GAS_JSONP_TIMEOUT_MS);
+    window[callbackName] = (data) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cleanup();
+      resolve(data);
+    };
+    script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cleanup();
+      reject(new Error("GAS_NETWORK_ERROR"));
+    };
+    script.src = appendQuery(GAS_WEB_APP_URL, { action, callback: callbackName, ...params });
+    document.head.appendChild(script);
+  });
+}
+
+async function checkRemoteReset({ showNotice = false } = {}) {
+  if (!GAS_ENABLED) return;
+  try {
+    const config = await gasJsonp("config");
+    if (!config?.ok) return;
+    const remoteVersion = Number(config.resetVersion || 0);
+    const localVersion = Number(localStorage.getItem(RESET_VERSION_KEY) || 0);
+    if (!localVersion) {
+      localStorage.setItem(RESET_VERSION_KEY, String(remoteVersion));
+      return;
+    }
+    if (remoteVersion <= localVersion) return;
+
+    const deviceId = getDeviceId();
+    localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(QR_SESSION_KEY);
+    sessionStorage.removeItem(QR_INVALID_KEY);
+    localStorage.setItem(RESET_VERSION_KEY, String(remoteVersion));
+    state = clone(DEFAULT_STATE);
+    pendingEarnAction = null;
+    pendingEarnExpiresAt = 0;
+    renderAll();
+    sendGasEvent("client_reset_applied", {
+      eventId: makeEventId("client_reset"),
+      itemId: String(remoteVersion),
+      itemName: "管理者リセットを端末へ反映",
+      balance: 0
+    });
+    if (showNotice) {
+      showMessage("ポイントカードをリセットしました", "管理者によるリセットをこの端末へ反映しました。", "🔄");
+    } else {
+      showToast("管理者リセットを反映しました", "success");
+    }
+    return deviceId;
+  } catch (error) {
+    console.warn("GAS設定の確認に失敗しました。", error);
+  }
+}
 
 const STORE = Object.freeze({
   name: "テクモピア ロックダム公津の杜店",
@@ -456,8 +605,9 @@ function confirmExchange() {
   }
   const before = state.points;
   state.points -= reward.cost;
+  const couponInstanceId = `${reward.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   state.coupons.push({
-    instanceId: `${reward.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    instanceId: couponInstanceId,
     couponId: reward.id,
     name: reward.name,
     cost: reward.cost,
@@ -474,6 +624,13 @@ function confirmExchange() {
   renderAll(false);
   animatePoints(before, state.points, `-${reward.cost}`);
   showToast("クーポンタブに収納しました", "success");
+  sendGasEvent("exchange", {
+    itemId: reward.id,
+    itemName: reward.name,
+    points: -reward.cost,
+    balance: state.points,
+    couponInstanceId
+  });
   pendingRewardId = null;
 }
 
@@ -535,6 +692,13 @@ function confirmUse() {
   closeModal("useModal");
   renderCoupons();
   showToast("クーポンを使用済みにしました", "success");
+  sendGasEvent("use", {
+    itemId: coupon.couponId,
+    itemName: coupon.name,
+    points: 0,
+    balance: state.points,
+    couponInstanceId: coupon.instanceId
+  });
   pendingUseId = null;
 }
 
@@ -936,6 +1100,15 @@ async function claimPoints() {
     animatePoints(before, state.points, `+${action.points}`);
     clearPendingEarn();
     const locationMode = accuracy <= FINE_ACCURACY_METERS ? "高精度測位" : "館内測位";
+    sendGasEvent("earn", {
+      itemId: action.token,
+      itemName: action.name,
+      points: action.points,
+      balance: state.points,
+      distance: Math.round(distance),
+      accuracy: Math.round(accuracy),
+      locationMode
+    });
     showMessage("ポイントGET！", `${action.name}で${action.points}ポイント獲得しました。\n${locationMode}：店舗から約${Math.round(distance)}m・測位精度約${Math.round(accuracy)}mで確認しました。`, "🌊");
     cleanUrl();
   } catch (error) {
@@ -1015,6 +1188,7 @@ function initEvents() {
       state = loadState();
       if (!pendingEarnAction) restorePendingEarn();
       renderAll();
+      checkRemoteReset();
     } else if (qrScannerActive) {
       stopQrScanner();
     }
@@ -1025,6 +1199,8 @@ function init() {
   initEvents();
   renderAll();
   processQrAccess();
+  checkRemoteReset({ showNotice: true });
+  setInterval(() => checkRemoteReset(), 5 * 60 * 1000);
 }
 
 document.addEventListener("DOMContentLoaded", init);
