@@ -1,24 +1,30 @@
 "use strict";
 
+const APP_BUILD = "2026.07.24-INDOOR-03";
+
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
 const STORE = Object.freeze({
   name: "テクモピア ロックダム公津の杜店",
   address: "千葉県成田市公津の杜4丁目5-3 成田ユアエルム3F",
-  latitude: 35.7596755,
-  longitude: 140.2965801
+  latitude: 35.7597375,
+  longitude: 140.297015625
 });
 
 const GEOLOCATION_OPTIONS = Object.freeze({
   enableHighAccuracy: true,
-  timeout: 15000,
+  timeout: 20000,
   maximumAge: 0
 });
 
-const MAX_ACCURACY_METERS = 200;
+// 屋内ではGPSが大きく揺れるため、複数回測位して最も精度の良い値を採用します。
+const LOCATION_SAMPLE_MS = 16000;
+const LOCATION_EARLY_SUCCESS_METERS = 80;
+const MAX_ACCURACY_METERS = 3000;
+const FINE_ACCURACY_METERS = 500;
 const QR_SESSION_KEY = "tecmopia_pending_earn_v2";
 const QR_INVALID_KEY = "tecmopia_invalid_earn_v2";
-const QR_AUTH_VALID_MS = 3 * 60 * 1000;
+const QR_AUTH_VALID_MS = 5 * 60 * 1000;
 
 const EARN_ACTIONS = Object.freeze({
   VISIT1: Object.freeze({
@@ -31,7 +37,7 @@ const EARN_ACTIONS = Object.freeze({
     description: "店頭QRを読み取り、店舗周辺で現在地を確認します。",
     oncePerDay: true,
     dateField: "lastCheckinDate",
-    radiusMeters: 150
+    radiusMeters: 250
   }),
   CRANE500: Object.freeze({
     id: "crane500",
@@ -42,7 +48,7 @@ const EARN_ACTIONS = Object.freeze({
     icon: "🕹️",
     description: "500円6プレイ利用後、スタッフ提示QRを読み取ります。",
     oncePerDay: false,
-    radiusMeters: 100
+    radiusMeters: 180
   }),
   MEDAL1200: Object.freeze({
     id: "medal1200",
@@ -53,7 +59,7 @@ const EARN_ACTIONS = Object.freeze({
     icon: "🪙",
     description: "1,200円貸出後、スタッフ提示QRを読み取ります。",
     oncePerDay: false,
-    radiusMeters: 100
+    radiusMeters: 180
   }),
   MEDAL2000: Object.freeze({
     id: "medal2000",
@@ -64,7 +70,7 @@ const EARN_ACTIONS = Object.freeze({
     icon: "🪙",
     description: "2,000円貸出後、スタッフ提示QRを読み取ります。",
     oncePerDay: false,
-    radiusMeters: 100
+    radiusMeters: 180
   }),
   MEDAL3000: Object.freeze({
     id: "medal3000",
@@ -75,7 +81,7 @@ const EARN_ACTIONS = Object.freeze({
     icon: "💰",
     description: "3,000円貸出後、スタッフ提示QRを読み取ります。",
     oncePerDay: false,
-    radiusMeters: 100
+    radiusMeters: 180
   }),
   MEDAL5000: Object.freeze({
     id: "medal5000",
@@ -86,7 +92,7 @@ const EARN_ACTIONS = Object.freeze({
     icon: "🏅",
     description: "5,000円貸出後、スタッフ提示QRを読み取ります。",
     oncePerDay: false,
-    radiusMeters: 100
+    radiusMeters: 180
   })
 });
 
@@ -381,9 +387,9 @@ function renderClaimPanel() {
   $("#claimTitle").textContent = `${pendingEarnAction.points}ポイント受け取れます`;
   $("#claimDescription").textContent = pendingEarnAction.name;
   $("#locationProof").hidden = false;
-  $("#locationProofText").textContent = `${STORE.name}から${pendingEarnAction.radiusMeters}m以内で加算`;
+  $("#locationProofText").textContent = `${STORE.name}周辺で測位誤差を考慮して判定`;
   claimButton.querySelector(".button-label").textContent = `現在地を確認して${pendingEarnAction.points}pt受け取る`;
-  $("#claimButtonNote").textContent = "このボタンを押した時に位置情報の使用許可を確認します。QR認証は3分間のみ有効です。";
+  $("#claimButtonNote").textContent = "このボタンを押した時に位置情報の使用許可を確認します。QR認証は5分間有効です。測位に失敗しても時間内は再試行できます。";
   claimButton.classList.remove("scan-button");
   claimButton.disabled = false;
   expiryBox.hidden = false;
@@ -790,13 +796,48 @@ function rescanQr() {
   openQrScanner();
 }
 
-function getCurrentPosition() {
+function getBestCurrentPosition(onProgress) {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(Object.assign(new Error("このブラウザは位置情報に対応していません。"), { code: "UNSUPPORTED" }));
       return;
     }
-    navigator.geolocation.getCurrentPosition(resolve, reject, GEOLOCATION_OPTIONS);
+
+    let bestPosition = null;
+    let lastError = null;
+    let watchId = null;
+    let settled = false;
+
+    const finish = (position, error) => {
+      if (settled) return;
+      settled = true;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      clearTimeout(timeoutId);
+      if (position) resolve(position);
+      else reject(error || lastError || new Error("現在地を取得できませんでした。"));
+    };
+
+    const timeoutId = setTimeout(() => {
+      finish(bestPosition, lastError);
+    }, LOCATION_SAMPLE_MS);
+
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const accuracy = Number(position.coords?.accuracy);
+        if (!Number.isFinite(accuracy)) return;
+        if (!bestPosition || accuracy < Number(bestPosition.coords.accuracy)) {
+          bestPosition = position;
+          if (typeof onProgress === "function") onProgress(accuracy);
+        }
+        if (accuracy <= LOCATION_EARLY_SUCCESS_METERS) finish(position, null);
+      },
+      (error) => {
+        lastError = error;
+        if (bestPosition) finish(bestPosition, null);
+        else finish(null, error);
+      },
+      GEOLOCATION_OPTIONS
+    );
   });
 }
 
@@ -843,18 +884,37 @@ async function claimPoints() {
   button.classList.add("btn-loading");
 
   try {
-    const position = await getCurrentPosition();
+    const buttonLabel = button.querySelector(".button-label");
+    if (buttonLabel) buttonLabel.textContent = "現在地を測定しています…";
+    showToast("館内のため、現在地を数秒間測定します");
+
+    const position = await getBestCurrentPosition((accuracy) => {
+      if (buttonLabel) buttonLabel.textContent = `現在地を測定中… 精度 約${Math.round(accuracy)}m`;
+    });
     const latitude = Number(position.coords.latitude);
     const longitude = Number(position.coords.longitude);
     const accuracy = Number(position.coords.accuracy);
     if (![latitude, longitude, accuracy].every(Number.isFinite)) throw new Error("位置情報を確認できませんでした。");
+
+    const distance = distanceMeters(STORE.latitude, STORE.longitude, latitude, longitude);
+    const effectiveDistance = Math.max(0, distance - Math.max(accuracy, 0));
+    const storeInsideAccuracyCircle = effectiveDistance <= action.radiusMeters;
+
     if (accuracy > MAX_ACCURACY_METERS) {
-      showMessage("位置情報の精度が不足しています", `現在の精度は約${Math.round(accuracy)}mです。入口付近などで再度お試しください。`, "📡");
+      showMessage(
+        "現在地の範囲が広すぎます",
+        `測位精度は約${Math.round(accuracy)}mでした。3,000mを超える場合は判定できません。端末のWi-Fiと位置情報をONにし、少し待ってから再度お試しください。QR認証は残っています。`,
+        "📡"
+      );
       return;
     }
-    const distance = distanceMeters(STORE.latitude, STORE.longitude, latitude, longitude);
-    if (distance > action.radiusMeters) {
-      showMessage("店舗周辺を確認できません", `店舗基準地点から約${Math.round(distance)}mと判定されました。${action.radiusMeters}m以内で再度お試しください。`, "📍");
+
+    if (!storeInsideAccuracyCircle) {
+      showMessage(
+        "店舗周辺を確認できませんでした",
+        `測定位置は店舗基準地点から約${Math.round(distance)}m、測位精度は約${Math.round(accuracy)}mでした。端末の誤差範囲に店舗が含まれていないため、今回は加算できません。QR認証は残っているので再試行できます。`,
+        "📍"
+      );
       return;
     }
 
@@ -875,7 +935,8 @@ async function claimPoints() {
     renderAll(false);
     animatePoints(before, state.points, `+${action.points}`);
     clearPendingEarn();
-    showMessage("ポイントGET！", `${action.name}で${action.points}ポイント獲得しました。`, "🌊");
+    const locationMode = accuracy <= FINE_ACCURACY_METERS ? "高精度測位" : "館内測位";
+    showMessage("ポイントGET！", `${action.name}で${action.points}ポイント獲得しました。\n${locationMode}：店舗から約${Math.round(distance)}m・測位精度約${Math.round(accuracy)}mで確認しました。`, "🌊");
     cleanUrl();
   } catch (error) {
     console.error("位置情報確認に失敗しました。", error);
