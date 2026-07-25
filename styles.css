@@ -473,3 +473,19 @@ body.modal-open{overflow:hidden}
 .coupon-state{top:10px;right:10px;border:1px solid rgba(255,255,255,.85);box-shadow:0 5px 16px rgba(5,54,96,.2);backdrop-filter:blur(8px)}
 .modal-coupon-banner{display:block;width:100%;aspect-ratio:3/1;object-fit:cover;margin:0 0 12px;border-radius:13px;border:1px solid rgba(6,61,120,.12);box-shadow:0 8px 20px rgba(5,76,133,.14)}
 @media(max-width:380px){.owned-coupon{padding:0}.owned-coupon-body{padding:12px 13px 13px}.coupon-state{position:absolute;display:inline-flex;margin:0}}
+
+
+/* 位置情報の利用案内 */
+.location-privacy{display:flex;align-items:flex-start;gap:10px;margin:10px 0 0;padding:11px 12px;border:1px solid #b9e7d7;border-radius:15px;text-align:left;color:#266a58;background:linear-gradient(145deg,#f5fffb,#eafbf5)}
+.location-privacy-icon{flex:0 0 auto;width:32px;height:32px;display:grid;place-items:center;border-radius:11px;background:#d9f6ea;font-size:1rem}
+.location-privacy b{display:block;font-size:.72rem;line-height:1.4}
+.location-privacy p{margin:4px 0 0;color:#5c7d73;font-size:.61rem;line-height:1.55}
+.location-notice-modal{max-width:390px}
+.location-symbol{background:#e8f8ff;box-shadow:inset 0 0 0 2px #bde8f6}
+.location-notice-list{display:grid;gap:8px;margin-top:14px;text-align:left}
+.location-notice-list>div{display:grid;grid-template-columns:38px 1fr;gap:9px;align-items:center;padding:10px 11px;border:1px solid #d8ebf3;border-radius:14px;background:#f7fcff}
+.location-notice-list>div>span{width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:#e5f7ff;font-size:1.1rem}
+.location-notice-list p{margin:0}
+.location-notice-list b{display:block;color:var(--ink);font-size:.73rem}
+.location-notice-list small{display:block;margin-top:3px;color:var(--muted);font-size:.61rem;line-height:1.45}
+.location-confirm-button{background:linear-gradient(135deg,#0876c9,#12a7e8);box-shadow:0 6px 0 #063d78,0 12px 20px rgba(8,118,201,.2)}

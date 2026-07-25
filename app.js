@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.25-BANNER-PREVIEW-02";
+const APP_BUILD = "2026.07.25-LOCATION-NOTICE-01";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -8,6 +8,7 @@ const STORAGE_KEY = "tecmopia_point_coupon_v1";
 const DEVICE_ID_KEY = "tecmopia_device_id_v1";
 const RESET_VERSION_KEY = "tecmopia_reset_version_v1";
 const PAGE_VIEW_DATE_KEY = "tecmopia_page_view_date_v1";
+const LOCATION_NOTICE_SESSION_KEY = "tecmopia_location_notice_confirmed_v1";
 const GAS_WEB_APP_URL = String(window.TECMOPIA_GAS_URL || "").trim();
 const GAS_PLACEHOLDER = "PASTE_GAS_WEB_APP_URL_HERE";
 const GAS_ENABLED = /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(?:\?.*)?$/i.test(GAS_WEB_APP_URL)
@@ -582,6 +583,7 @@ function renderClaimPanel() {
   panel.classList.remove("ready", "completed", "closed", "period-ended");
   claimButton.classList.remove("scan-button", "earn-button");
   $("#locationProof").hidden = true;
+  $("#locationPrivacy").hidden = true;
   expiryBox.hidden = true;
   rescanButton.hidden = true;
 
@@ -660,9 +662,10 @@ function renderClaimPanel() {
   $("#claimTitle").textContent = `${pendingEarnAction.points}ポイント受け取れます`;
   $("#claimDescription").textContent = pendingEarnAction.name;
   $("#locationProof").hidden = false;
-  $("#locationProofText").textContent = `${STORE.name}周辺で測位誤差を考慮して判定`;
+  $("#locationProofText").textContent = `${STORE.name}周辺にいる場合のみ加算`;
+  $("#locationPrivacy").hidden = false;
   claimButton.querySelector(".button-label").textContent = `現在地を確認して${pendingEarnAction.points}pt受け取る`;
-  $("#claimButtonNote").textContent = "このボタンを押した時に位置情報の使用許可を確認します。QR認証は5分間有効です。測位に失敗しても時間内は再試行できます。";
+  $("#claimButtonNote").textContent = "ボタンを押すと、位置情報についてのご案内を表示します。QR認証は5分間有効で、測位に失敗しても時間内は再試行できます。";
   claimButton.classList.add("earn-button");
   claimButton.disabled = false;
   expiryBox.hidden = false;
@@ -1151,13 +1154,38 @@ async function scanQrImage(file) {
   }
 }
 
+function hasConfirmedLocationNotice() {
+  try {
+    return sessionStorage.getItem(LOCATION_NOTICE_SESSION_KEY) === "1";
+  } catch (error) {
+    return false;
+  }
+}
+
+function confirmLocationNotice() {
+  try {
+    sessionStorage.setItem(LOCATION_NOTICE_SESSION_KEY, "1");
+  } catch (error) {
+    console.warn("位置情報案内の確認状態を保存できませんでした。", error);
+  }
+  closeModal("locationNoticeModal");
+  claimPoints();
+}
+
 function handleClaimButton() {
   if (!isEarnPeriod()) {
     showMessage("ポイント受け取り期間は終了しました", `ポイントの受け取りは${earnDeadlineText()}です。`, "📅");
     return;
   }
-  if (pendingEarnAction) claimPoints();
-  else openQrScanner();
+  if (pendingEarnAction) {
+    if (!hasConfirmedLocationNotice()) {
+      openModal("locationNoticeModal");
+      return;
+    }
+    claimPoints();
+  } else {
+    openQrScanner();
+  }
 }
 
 function rescanQr() {
@@ -1271,7 +1299,7 @@ async function claimPoints() {
   try {
     const buttonLabel = button.querySelector(".button-label");
     if (buttonLabel) buttonLabel.textContent = "現在地を測定しています…";
-    showToast("館内のため、現在地を数秒間測定します");
+    showToast("ポイント加算のため、現在地を数秒間確認します");
 
     const position = await getBestCurrentPosition((accuracy) => {
       if (buttonLabel) buttonLabel.textContent = `現在地を測定中… 精度 約${Math.round(accuracy)}m`;
@@ -1389,6 +1417,7 @@ function initEvents() {
   $$('[data-target-screen]').forEach((button) => button.addEventListener("click", () => switchScreen(button.dataset.targetScreen)));
   $("#homeActionButton").addEventListener("click", () => switchScreen("earnScreen"));
   $("#claimButton").addEventListener("click", handleClaimButton);
+  $("#confirmLocationButton").addEventListener("click", confirmLocationNotice);
   $("#rescanButton").addEventListener("click", rescanQr);
   $("#closeScannerButton").addEventListener("click", closeQrScanner);
   $("#qrImageInput").addEventListener("change", (event) => scanQrImage(event.target.files?.[0]));

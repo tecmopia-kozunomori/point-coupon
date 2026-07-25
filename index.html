@@ -7,7 +7,7 @@
   <meta name="color-scheme" content="light">
   <meta name="description" content="テクモピア公津の杜店 デジタルポイントカード">
   <title>TECMOPIA デジタルポイントカード</title>
-  <link rel="stylesheet" href="./styles.css?v=20260725-bannerpreview02">
+  <link rel="stylesheet" href="./styles.css?v=20260725-locationnotice01">
   <script>
     (() => {
       try {
@@ -32,7 +32,7 @@
   </script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
   <script src="gas-config.js"></script>
-  <script src="./app.js?v=20260725-bannerpreview02" defer></script>
+  <script src="./app.js?v=20260725-locationnotice01" defer></script>
 </head>
 <body>
   <div class="page-sky" aria-hidden="true">
@@ -175,6 +175,13 @@
         <div id="locationProof" class="location-proof" hidden>
           <span>📍</span><b id="locationProofText">店舗周辺で現在地を確認します</b>
         </div>
+        <div id="locationPrivacy" class="location-privacy" hidden>
+          <span class="location-privacy-icon" aria-hidden="true">🔒</span>
+          <div>
+            <b>位置情報はポイント加算にのみ使用します</b>
+            <p>店舗周辺にいることを確認するため、受け取り操作時のみ現在地を測定します。継続的な追跡や移動履歴の保存は行いません。</p>
+          </div>
+        </div>
         <div id="claimExpiry" class="claim-expiry" hidden>
           <span>⏳</span>
           <div><small>QR認証の有効時間</small><b id="claimExpiryText">05:00</b></div>
@@ -205,7 +212,7 @@
 
       <aside class="location-callout">
         <span>📍</span>
-        <div><b>店舗周辺でのみ加算できます</b><p>館内では現在地を数秒間測定し、最も精度の良い位置と測位誤差を考慮して判定します。</p></div>
+        <div><b>店舗周辺でのみ加算できます</b><p>位置情報はポイント加算の判定にのみ使用し、受け取り操作時だけ測定します。継続的な追跡や移動履歴の保存は行いません。</p></div>
       </aside>
     </section>
 
@@ -283,6 +290,27 @@
         <input id="qrImageInput" type="file" accept="image/*" capture="environment">
       </label>
       <button id="closeScannerButton" class="secondary-button" type="button">カメラを閉じる</button>
+    </section>
+  </div>
+
+  <div id="locationNoticeModal" class="modal-backdrop" aria-hidden="true">
+    <section class="modal location-notice-modal" role="dialog" aria-modal="true" aria-labelledby="locationNoticeTitle" tabindex="-1">
+      <div class="modal-symbol location-symbol">📍</div>
+      <span class="modal-kicker">LOCATION CHECK</span>
+      <h2 id="locationNoticeTitle">位置情報を確認します</h2>
+      <p>ポイントは店舗周辺でのみ加算できます。端末やブラウザの設定により、このあと位置情報の許可画面が表示されます。</p>
+      <div class="location-notice-list">
+        <div><span>🏬</span><p><b>店舗にいることを確認</b><small>店舗周辺にいる場合だけポイントを加算します。</small></p></div>
+        <div><span>🔒</span><p><b>ポイント加算にのみ使用</b><small>広告やその他の目的には使用しません。</small></p></div>
+        <div><span>⏱️</span><p><b>確認時のみ測定</b><small>継続的な追跡や移動履歴の保存は行いません。</small></p></div>
+      </div>
+      <div class="modal-actions">
+        <button id="confirmLocationButton" class="primary-button location-confirm-button" type="button">
+          <span class="button-label">内容を確認して現在地を許可する</span>
+          <span class="button-spinner" aria-hidden="true"></span>
+        </button>
+        <button class="secondary-button" type="button" data-close-modal="locationNoticeModal">キャンセル</button>
+      </div>
     </section>
   </div>
 
