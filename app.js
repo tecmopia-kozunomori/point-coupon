@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.25-LOCATION-NOTICE-01";
+const APP_BUILD = "2026.07.25-COUPON-NOTES-02";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -275,14 +275,14 @@ const EARN_ACTIONS = Object.freeze({
 });
 
 const REWARDS = Object.freeze([
-  { id: "crane_plus1", name: "クレーンゲーム1回増量券", cost: 3, icon: "🕹️", type: "crane", tint: "#e4f7ff", banner: "./images/coupons/coupon_crane_bonus_1play.webp" },
+  { id: "crane_plus1", name: "クレーンゲーム1回増量券", cost: 3, icon: "🕹️", type: "crane", tint: "#e4f7ff", banner: "./images/coupons/coupon_crane_bonus_1play.webp", notice: "対象台に限ります。", noticeDetail: "筐体ガラス面に設置されている案内をご確認ください。" },
   { id: "medal_10", name: "ゲームメダル10枚引換券", cost: 3, icon: "🪙", type: "medal", tint: "#fff6d8", banner: "./images/coupons/coupon_medal_10.webp" },
-  { id: "crane_free1", name: "クレーンゲーム1回無料券", cost: 6, icon: "🎮", type: "crane", tint: "#e4f7ff", banner: "./images/coupons/coupon_crane_free_1play.webp" },
+  { id: "crane_free1", name: "クレーンゲーム1回無料券", cost: 6, icon: "🎮", type: "crane", tint: "#e4f7ff", banner: "./images/coupons/coupon_crane_free_1play.webp", notice: "対象台に限ります。", noticeDetail: "筐体ガラス面に設置されている案内をご確認ください。" },
   { id: "medal_30", name: "ゲームメダル30枚引換券", cost: 6, icon: "🪙", type: "medal", tint: "#fff6d8", banner: "./images/coupons/coupon_medal_30.webp" },
-  { id: "crane_500_7", name: "クレーンゲーム500円で7PLAY券", cost: 6, icon: "7️⃣", type: "crane", tint: "#e9f6ff", banner: "./images/coupons/coupon_crane_500yen_7play.webp" },
-  { id: "crane_free3", name: "クレーンゲーム3回無料券", cost: 15, icon: "🏆", type: "crane", tint: "#e5f8ff", banner: "./images/coupons/coupon_crane_free_3play.webp" },
+  { id: "crane_500_7", name: "クレーンゲーム500円で7PLAY券", cost: 6, icon: "7️⃣", type: "crane", tint: "#e9f6ff", banner: "./images/coupons/coupon_crane_500yen_7play.webp", notice: "対象台に限ります。", noticeDetail: "筐体ガラス面に設置されている案内をご確認ください。" },
+  { id: "crane_free3", name: "クレーンゲーム3回無料券", cost: 15, icon: "🏆", type: "crane", tint: "#e5f8ff", banner: "./images/coupons/coupon_crane_free_3play.webp", notice: "対象台に限ります。", noticeDetail: "筐体ガラス面に設置されている案内をご確認ください。" },
   { id: "medal_99", name: "ゲームメダル99枚引換券", cost: 15, icon: "✨", type: "medal", tint: "#fff4ce", banner: "./images/coupons/coupon_medal_99.webp" },
-  { id: "prize_choice", name: "お好きな景品と交換券", cost: 50, icon: "🎁", type: "prize", tint: "#f2eaff", banner: "./images/coupons/coupon_special_prize.webp" },
+  { id: "prize_choice", name: "お好きな景品と交換券", cost: 50, icon: "🎁", type: "prize", tint: "#f2eaff", banner: "./images/coupons/coupon_special_prize.webp", notice: "店内在庫があるものに限ります。" },
   { id: "medal_3333", name: "ゲームメダル3,333枚引換券", cost: 50, icon: "👑", type: "medal", tint: "#fff1c2", banner: "./images/coupons/coupon_medal_3333.webp" }
 ]);
 
@@ -713,7 +713,11 @@ function renderExchange() {
               ${reward.banner ? `<div class="exchange-banner-wrap"><img class="exchange-banner-image" src="${escapeHtml(reward.banner)}" alt="${escapeHtml(reward.name)}" loading="lazy" decoding="async" width="750" height="250"></div>` : ""}
               <div class="exchange-card-body">
                 <span class="exchange-icon">${escapeHtml(reward.icon)}</span>
-                <div><div class="exchange-name">${escapeHtml(reward.name)}</div><div class="exchange-cost">${reward.cost}<small>pt</small></div></div>
+                <div>
+                  <div class="exchange-name">${escapeHtml(reward.name)}</div>
+                  <div class="exchange-cost">${reward.cost}<small>pt</small></div>
+                  ${couponNoticeHtml(reward, "exchange-condition")}
+                </div>
                 <button class="exchange-button" type="button" data-reward-id="${escapeHtml(reward.id)}" ${enabled ? "" : "disabled"}>${label}</button>
               </div>
             </article>`;
@@ -736,6 +740,25 @@ function getCouponBanner(coupon) {
   return getReward(coupon.couponId)?.banner || "";
 }
 
+function getCouponNotice(item) {
+  if (!item) return { title: "", detail: "" };
+  const reward = item.id ? item : getReward(item.couponId);
+  return {
+    title: String(item.notice || reward?.notice || ""),
+    detail: String(item.noticeDetail || reward?.noticeDetail || "")
+  };
+}
+
+function couponNoticeHtml(item, extraClass = "") {
+  const notice = getCouponNotice(item);
+  if (!notice.title) return "";
+  return `
+    <div class="coupon-condition ${escapeHtml(extraClass)}">
+      <strong>※ ${escapeHtml(notice.title)}</strong>
+      ${notice.detail ? `<small>${escapeHtml(notice.detail)}</small>` : ""}
+    </div>`;
+}
+
 function openExchangeConfirm(rewardId) {
   if (!isExchangeUsePeriod()) {
     showMessage("ポイント交換期間は終了しました", `ポイント交換は${exchangeUseDeadlineText()}です。`, "📅");
@@ -744,7 +767,7 @@ function openExchangeConfirm(rewardId) {
   const reward = getReward(rewardId);
   if (!reward || state.points < reward.cost) return;
   pendingRewardId = rewardId;
-  $("#exchangePreview").innerHTML = `${reward.banner ? `<img class="modal-coupon-banner" src="${escapeHtml(reward.banner)}" alt="${escapeHtml(reward.name)}" loading="lazy" decoding="async" width="750" height="250">` : `<div class="big-icon">${escapeHtml(reward.icon)}</div>`}<b>${escapeHtml(reward.name)}</b><div class="preview-cost">${reward.cost}<small>pt</small></div>`;
+  $("#exchangePreview").innerHTML = `${reward.banner ? `<div class="modal-coupon-banner-wrap"><img class="modal-coupon-banner" src="${escapeHtml(reward.banner)}" alt="${escapeHtml(reward.name)}" loading="eager" decoding="async" width="750" height="250"></div>` : `<div class="big-icon">${escapeHtml(reward.icon)}</div>`}<b>${escapeHtml(reward.name)}</b><div class="preview-cost">${reward.cost}<small>pt</small></div>${couponNoticeHtml(reward, "modal-condition")}`;
   openModal("exchangeModal");
 }
 
@@ -777,6 +800,8 @@ function confirmExchange() {
     type: reward.type,
     tint: reward.tint,
     banner: reward.banner,
+    notice: reward.notice || "",
+    noticeDetail: reward.noticeDetail || "",
     exchangedAt: new Date().toISOString(),
     used: false,
     usedAt: null
@@ -855,6 +880,7 @@ function renderCoupons() {
             <div class="owned-name">${escapeHtml(coupon.name || "クーポン")}</div>
             <div class="owned-date">交換：${formatDate(coupon.exchangedAt)}</div>
             <div class="owned-date coupon-expiry">使用期限：${formatCampaignDate(CAMPAIGN_DATES.exchangeUseEnd)}</div>
+            ${couponNoticeHtml(coupon, "owned-condition")}
             ${coupon.used ? `<div class="owned-date">使用：${formatDate(coupon.usedAt)}</div>` : ""}
           </div>
         </div>
@@ -877,7 +903,7 @@ function openUseConfirm(instanceId) {
   if (!coupon || coupon.used) return;
   pendingUseId = instanceId;
   const banner = getCouponBanner(coupon);
-  $("#usePreview").innerHTML = `${banner ? `<img class="modal-coupon-banner" src="${escapeHtml(banner)}" alt="${escapeHtml(coupon.name || "クーポン")}" loading="lazy" decoding="async" width="750" height="250">` : `<div class="big-icon">${escapeHtml(coupon.icon || "🎫")}</div>`}<b>${escapeHtml(coupon.name || "クーポン")}</b>`;
+  $("#usePreview").innerHTML = `${banner ? `<div class="modal-coupon-banner-wrap"><img class="modal-coupon-banner" src="${escapeHtml(banner)}" alt="${escapeHtml(coupon.name || "クーポン")}" loading="eager" decoding="async" width="750" height="250"></div>` : `<div class="big-icon">${escapeHtml(coupon.icon || "🎫")}</div>`}<b>${escapeHtml(coupon.name || "クーポン")}</b>${couponNoticeHtml(coupon, "modal-condition")}`;
   openModal("useModal");
 }
 

@@ -471,7 +471,21 @@ body.modal-open{overflow:hidden}
 .owned-coupon-body{padding:14px 15px 15px}
 .owned-coupon.used .coupon-banner-image,.owned-coupon.expired .coupon-banner-image{filter:grayscale(.8);opacity:.62}
 .coupon-state{top:10px;right:10px;border:1px solid rgba(255,255,255,.85);box-shadow:0 5px 16px rgba(5,54,96,.2);backdrop-filter:blur(8px)}
-.modal-coupon-banner{display:block;width:100%;aspect-ratio:3/1;object-fit:cover;margin:0 0 12px;border-radius:13px;border:1px solid rgba(6,61,120,.12);box-shadow:0 8px 20px rgba(5,76,133,.14)}
+.confirm-modal{max-width:430px}
+.modal-preview{overflow:visible;padding:12px}
+.modal-coupon-banner-wrap{width:100%;margin:0 0 12px;padding:4px;border:1px solid rgba(6,61,120,.14);border-radius:13px;background:#fff;box-shadow:0 8px 20px rgba(5,76,133,.14)}
+.modal-coupon-banner{display:block;width:100%;max-width:100%;height:auto;aspect-ratio:auto;object-fit:contain;margin:0;border:0;border-radius:9px;box-shadow:none}
+.coupon-condition{margin-top:9px;padding:8px 10px;border:1px solid #f1d88f;border-radius:12px;text-align:left;color:#725400;background:#fff9df}
+.coupon-condition strong{display:block;font-size:.65rem;line-height:1.45}
+.coupon-condition small{display:block;margin-top:3px;color:#7e765e;font-size:.56rem;line-height:1.5}
+.exchange-condition{margin-top:7px;padding:7px 8px}
+.exchange-condition strong{font-size:.59rem}
+.exchange-condition small{font-size:.52rem}
+.owned-condition{margin-top:8px}
+.modal-condition{margin-top:10px}
+.modal-condition strong{font-size:.7rem}
+.modal-condition small{font-size:.6rem}
+@media(max-width:380px){.confirm-modal{max-width:100%}.modal-preview{padding:9px}.coupon-condition{padding:7px 8px}}
 @media(max-width:380px){.owned-coupon{padding:0}.owned-coupon-body{padding:12px 13px 13px}.coupon-state{position:absolute;display:inline-flex;margin:0}}
 
 
