@@ -167,3 +167,294 @@ body.modal-open{overflow:hidden}
 @media(min-width:700px){.scanner-backdrop{align-items:center}.scanner-modal{border-radius:28px}}
 
 .rescan-button{width:100%;min-height:42px;margin-top:9px;border:1px solid #9bd5ea;border-radius:13px;color:#0876a6;background:#f4fbff;font-size:.68rem;font-weight:900;cursor:pointer}.rescan-button:active{transform:translateY(2px)}
+
+
+/* ===== 2026-07-25: 押せるボタンの強調・営業時間外表示 ===== */
+.primary-button,
+.action-banner button,
+.quick-card,
+.file-scan-button,
+.rescan-button {
+  position:relative;
+  isolation:isolate;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.scan-button,
+.earn-button {
+  min-height:62px;
+  border:2px solid rgba(255,255,255,.78);
+  font-size:.9rem;
+  letter-spacing:.015em;
+  box-shadow:0 8px 0 var(--navy),0 16px 30px rgba(8,118,201,.32),inset 0 1px 0 rgba(255,255,255,.35);
+}
+
+.scan-button::before,
+.earn-button::before {
+  display:inline-grid;
+  place-items:center;
+  width:28px;
+  height:28px;
+  margin-right:9px;
+  border-radius:9px;
+  color:#075184;
+  background:#fff;
+  font-size:1rem;
+  line-height:1;
+  vertical-align:middle;
+  box-shadow:0 3px 0 rgba(0,51,92,.2);
+}
+.scan-button::before{content:"📷"}
+.earn-button::before{content:"＋";font-weight:900}
+
+.scan-button:not(:disabled),
+.earn-button:not(:disabled) {
+  animation:buttonAttention 1.8s ease-in-out infinite;
+}
+
+.scan-button:not(:disabled)::after,
+.earn-button:not(:disabled)::after {
+  content:"タップ";
+  position:absolute;
+  right:10px;
+  top:-10px;
+  padding:4px 8px;
+  border:2px solid #fff;
+  border-radius:999px;
+  color:#704d00;
+  background:var(--yellow);
+  font-size:.55rem;
+  font-weight:900;
+  line-height:1;
+  box-shadow:0 4px 10px rgba(83,62,0,.2);
+}
+
+@keyframes buttonAttention {
+  0%,100% { transform:translateY(0); filter:brightness(1); }
+  50% { transform:translateY(-2px); filter:brightness(1.08); }
+}
+
+.primary-button:not(:disabled):active,
+.action-banner button:active,
+.quick-card:active,
+.file-scan-button:active,
+.rescan-button:active {
+  transform:translateY(4px) scale(.99);
+  box-shadow:none;
+}
+
+.quick-card {
+  border:2px solid #c8e7f3;
+  box-shadow:0 6px 0 #c3dce7,0 12px 22px rgba(5,76,133,.13);
+}
+.quick-card::after {
+  content:"押す";
+  position:absolute;
+  right:8px;
+  top:7px;
+  padding:3px 6px;
+  border-radius:999px;
+  color:#fff;
+  background:var(--blue);
+  font-size:.49rem;
+  font-weight:900;
+}
+
+.action-banner button {
+  border:2px solid rgba(255,255,255,.8);
+  box-shadow:0 5px 0 var(--navy),0 9px 18px rgba(8,118,201,.22);
+}
+
+.claim-panel.closed {
+  border-color:#f0c36a;
+  background:linear-gradient(145deg,#fff,#fff8e7);
+}
+.claim-panel.closed .claim-visual {
+  color:#734f00;
+  background:linear-gradient(145deg,#ffe986,var(--yellow));
+  box-shadow:0 7px 0 #d49b00;
+}
+.claim-panel.closed .claim-copy>span {
+  color:#8a5c00;
+  background:#fff0bd;
+}
+.claim-panel.closed .location-proof {
+  color:#805700;
+  background:#fff4d2;
+}
+.claim-panel.closed .primary-button:disabled {
+  opacity:1;
+  color:#725c28;
+  background:linear-gradient(135deg,#e8dfc6,#d8ccb0);
+  border-color:#f7efd9;
+  box-shadow:0 5px 0 #a99b78;
+}
+
+@media(prefers-reduced-motion:reduce){
+  .scan-button:not(:disabled),.earn-button:not(:disabled){animation:none}
+}
+
+
+/* ===== 2026-07-25: お客様向け注意事項 ===== */
+.customer-notice{
+  margin-top:14px;
+  border:2px solid #f1c56b;
+  border-radius:20px;
+  background:linear-gradient(145deg,#fffdf7,#fff7df);
+  box-shadow:0 8px 0 #e3b957,0 14px 28px rgba(112,78,0,.12);
+  overflow:hidden;
+}
+.customer-notice summary{
+  display:grid;
+  grid-template-columns:40px 1fr auto;
+  align-items:center;
+  gap:10px;
+  min-height:66px;
+  padding:12px 14px;
+  list-style:none;
+  cursor:pointer;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.customer-notice summary::-webkit-details-marker{display:none}
+.customer-notice-icon{
+  width:40px;
+  height:40px;
+  display:grid;
+  place-items:center;
+  border-radius:13px;
+  color:#fff;
+  background:linear-gradient(145deg,#ffab32,#f07823);
+  box-shadow:0 5px 0 #b85a15;
+  font-size:1.25rem;
+  font-weight:900;
+}
+.customer-notice summary small{
+  display:block;
+  color:#b46118;
+  font-size:.56rem;
+  font-weight:900;
+  letter-spacing:.12em;
+}
+.customer-notice summary b{
+  display:block;
+  margin-top:3px;
+  color:#593d1d;
+  font-size:.86rem;
+  line-height:1.4;
+}
+.customer-notice summary i{
+  color:#c27022;
+  font-size:1.65rem;
+  font-style:normal;
+  transition:transform .2s ease;
+}
+.customer-notice[open] summary i{transform:rotate(90deg)}
+.customer-notice-body{
+  padding:0 14px 15px;
+  border-top:1px solid rgba(196,128,39,.25);
+}
+.customer-notice-lead{
+  margin:12px 0 9px;
+  color:#755a3d;
+  font-size:.7rem;
+  font-weight:800;
+  line-height:1.55;
+}
+.customer-notice ul{
+  display:grid;
+  gap:8px;
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+.customer-notice li{
+  position:relative;
+  padding:9px 10px 9px 28px;
+  border-radius:13px;
+  color:#70563a;
+  background:rgba(255,255,255,.8);
+  font-size:.65rem;
+  line-height:1.6;
+}
+.customer-notice li::before{
+  content:"•";
+  position:absolute;
+  left:12px;
+  top:8px;
+  color:#ef7d28;
+  font-size:1rem;
+  font-weight:900;
+}
+.customer-notice li b{color:#b64c23}
+.customer-notice summary:focus-visible{
+  outline:4px solid rgba(255,216,74,.9);
+  outline-offset:-4px;
+}
+
+/* ===== 2026-07-25: 注意事項をタップ表示へ変更 ===== */
+.customer-notice:not([open]) summary{
+  background:linear-gradient(145deg,#fffdf8,#fff4d9);
+}
+.customer-notice:not([open]) summary::after{
+  content:"開く";
+  justify-self:end;
+  margin-right:2px;
+  padding:4px 8px;
+  border-radius:999px;
+  color:#9b551d;
+  background:#ffe9b6;
+  font-size:.55rem;
+  font-weight:900;
+}
+.customer-notice:not([open]) summary i{display:none}
+.customer-notice[open] summary::after{content:none}
+
+/* ===== 2026-07-25: キャンペーン期限表示 ===== */
+.campaign-period{
+  margin:15px 0 0;
+  padding:13px;
+  border:2px solid #8ed9ec;
+  border-radius:19px;
+  background:linear-gradient(145deg,#fff,#eafaff);
+  box-shadow:var(--shadow-sm);
+}
+.campaign-period-title{display:flex;align-items:center;gap:7px;margin-bottom:9px;color:#075b97;font-size:.75rem}
+.campaign-period-title span{font-size:1.05rem}.campaign-period-title b{font-weight:900}
+.campaign-period-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 9px;border-radius:12px;background:rgba(255,255,255,.84);font-size:.64rem}
+.campaign-period-row+.campaign-period-row{margin-top:6px}
+.campaign-period-row span{color:#617b8d;font-weight:800}.campaign-period-row strong{color:#075b97;font-size:.68rem;text-align:right}
+
+.deadline-notice{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  margin:0 0 14px;
+  padding:12px 13px;
+  border:2px solid #8ed9ec;
+  border-radius:17px;
+  color:#155c7b;
+  background:linear-gradient(145deg,#fff,#eafaff);
+  box-shadow:var(--shadow-sm);
+}
+.deadline-notice>span{font-size:1.25rem;line-height:1}
+.deadline-notice b{display:block;font-size:.76rem;line-height:1.45}
+.deadline-notice p{margin:4px 0 0;color:#668395;font-size:.64rem;line-height:1.5}
+.deadline-notice.ended{border-color:#e2b6ba;color:#9e2f3b;background:linear-gradient(145deg,#fff,#fff0f2)}
+.deadline-notice.ended p{color:#9b6268}
+.earn-deadline{margin-top:-3px}
+
+.claim-panel.period-ended{border-color:#e2b6ba;background:linear-gradient(145deg,#fff,#fff1f2)}
+.claim-panel.period-ended .claim-visual{background:linear-gradient(145deg,#e94b5b,#ff7b87);box-shadow:0 7px 0 #a92836}
+.claim-panel.period-ended .claim-copy>span{color:#a02c39;background:#ffe4e7}
+.claim-panel.period-ended .location-proof{color:#9d3540;background:#fff0f2}
+
+.exchange-card.period-ended{opacity:.7;background:#f4f7f8}
+.owned-coupon.expired{filter:grayscale(.72);opacity:.72}
+.owned-coupon.expired .coupon-state{color:#a03944;background:#ffe9eb}
+.coupon-expiry{color:#b33d48;font-weight:900}
+
+@media(max-width:380px){
+  .campaign-period-row{align-items:flex-start;flex-direction:column;gap:3px}
+  .campaign-period-row strong{text-align:left}
+}

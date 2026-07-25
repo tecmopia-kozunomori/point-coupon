@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.24-GAS-ADMIN-05";
+const APP_BUILD = "2026.07.25-DEADLINE-01";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -364,6 +364,63 @@ function getTodayKey() {
   return `${year}-${month}-${day}`;
 }
 
+const BUSINESS_HOURS = Object.freeze({ startHour: 10, endHour: 20 });
+const CAMPAIGN_DATES = Object.freeze({
+  earnEnd: "2026-09-20",
+  exchangeUseEnd: "2026-09-30"
+});
+
+function getJapanTimeParts(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Tokyo",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  });
+  return Object.fromEntries(
+    formatter.formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+}
+
+function isBusinessHours(date = new Date()) {
+  const { hour } = getJapanTimeParts(date);
+  const currentHour = Number(hour);
+  return currentHour >= BUSINESS_HOURS.startHour && currentHour < BUSINESS_HOURS.endHour;
+}
+
+function businessHoursText() {
+  return `${BUSINESS_HOURS.startHour}:00〜${BUSINESS_HOURS.endHour}:00`;
+}
+
+function getJapanDateKey(date = new Date()) {
+  const { year, month, day } = getJapanDateParts(date);
+  return `${year}-${month}-${day}`;
+}
+
+function isEarnPeriod(date = new Date()) {
+  return getJapanDateKey(date) <= CAMPAIGN_DATES.earnEnd;
+}
+
+function isExchangeUsePeriod(date = new Date()) {
+  return getJapanDateKey(date) <= CAMPAIGN_DATES.exchangeUseEnd;
+}
+
+function formatCampaignDate(dateKey) {
+  const [year, month, day] = String(dateKey).split("-").map(Number);
+  return `${year}年${month}月${day}日`;
+}
+
+function earnDeadlineText() {
+  return `${formatCampaignDate(CAMPAIGN_DATES.earnEnd)}まで`;
+}
+
+function exchangeUseDeadlineText() {
+  return `${formatCampaignDate(CAMPAIGN_DATES.exchangeUseEnd)}まで`;
+}
+
 function formatToday() {
   const { month, day } = getJapanDateParts();
   return `${Number(month)}/${Number(day)}`;
@@ -519,13 +576,31 @@ function renderClaimPanel() {
   const claimButton = $("#claimButton");
   const expiryBox = $("#claimExpiry");
   const rescanButton = $("#rescanButton");
-  panel.classList.remove("ready", "completed");
+  panel.classList.remove("ready", "completed", "closed", "period-ended");
+  claimButton.classList.remove("scan-button", "earn-button");
   $("#locationProof").hidden = true;
   expiryBox.hidden = true;
   rescanButton.hidden = true;
 
   if (pendingEarnAction && (!pendingEarnExpiresAt || pendingEarnExpiresAt <= Date.now())) {
     clearPendingEarn();
+  }
+
+  if (!isEarnPeriod()) {
+    clearPendingEarn();
+    panel.classList.add("closed", "period-ended");
+    $("#claimIcon").textContent = "📅";
+    $("#claimBadge").textContent = "ポイント受付終了";
+    $("#claimTitle").textContent = "ポイント受け取り期間は終了しました";
+    $("#claimDescription").textContent = `ポイントの受け取りは${earnDeadlineText()}でした。保有ポイントの確認は引き続き行えます。`;
+    $("#locationProof").hidden = false;
+    $("#locationProofText").textContent = `ポイント交換・クーポン利用は${exchangeUseDeadlineText()}`;
+    claimButton.querySelector(".button-label").textContent = "ポイント受付は終了しました";
+    $("#claimButtonNote").textContent = "ポイント交換とクーポンの利用期限をご確認ください。";
+    claimButton.disabled = true;
+    $("#homeActionBanner").hidden = true;
+    stopExpiryTimer();
+    return;
   }
 
   if (!pendingEarnAction) {
@@ -558,6 +633,24 @@ function renderClaimPanel() {
     return;
   }
 
+  if (!isBusinessHours()) {
+    panel.classList.add("closed");
+    $("#claimIcon").textContent = "🕙";
+    $("#claimBadge").textContent = "営業時間外";
+    $("#claimTitle").textContent = "現在はポイントを受け取れません";
+    $("#claimDescription").textContent = `ポイント加算は営業時間内（${businessHoursText()}）のみ利用できます。ページの閲覧や特典の確認はそのまま行えます。`;
+    $("#locationProof").hidden = false;
+    $("#locationProofText").textContent = `ポイント加算受付時間 ${businessHoursText()}`;
+    claimButton.querySelector(".button-label").textContent = `営業時間外（${businessHoursText()}）`;
+    $("#claimButtonNote").textContent = "QR認証が残っている場合も、営業時間内にもう一度操作してください。";
+    claimButton.disabled = true;
+    expiryBox.hidden = false;
+    rescanButton.hidden = false;
+    startExpiryTimer();
+    $("#homeActionBanner").hidden = true;
+    return;
+  }
+
   panel.classList.add("ready");
   $("#claimIcon").textContent = pendingEarnAction.icon;
   $("#claimBadge").textContent = pendingEarnAction.oncePerDay ? "来店QR認証済み" : "スタッフQR認証済み";
@@ -567,7 +660,7 @@ function renderClaimPanel() {
   $("#locationProofText").textContent = `${STORE.name}周辺で測位誤差を考慮して判定`;
   claimButton.querySelector(".button-label").textContent = `現在地を確認して${pendingEarnAction.points}pt受け取る`;
   $("#claimButtonNote").textContent = "このボタンを押した時に位置情報の使用許可を確認します。QR認証は5分間有効です。測位に失敗しても時間内は再試行できます。";
-  claimButton.classList.remove("scan-button");
+  claimButton.classList.add("earn-button");
   claimButton.disabled = false;
   expiryBox.hidden = false;
   rescanButton.hidden = false;
@@ -584,7 +677,20 @@ function groupRewards() {
 }
 
 function renderExchange() {
+  const exchangeAvailable = isExchangeUsePeriod();
   $("#exchangeBalance").textContent = state.points.toLocaleString("ja-JP");
+
+  const deadlineNotice = $("#exchangeDeadlineNotice");
+  if (deadlineNotice) {
+    deadlineNotice.classList.toggle("ended", !exchangeAvailable);
+    deadlineNotice.querySelector("b").textContent = exchangeAvailable
+      ? `ポイント交換期限：${exchangeUseDeadlineText()}`
+      : "ポイント交換期間は終了しました";
+    deadlineNotice.querySelector("p").textContent = exchangeAvailable
+      ? "期限内に交換したクーポンも、同じ日までにご利用ください。"
+      : `ポイント交換・クーポン利用は${exchangeUseDeadlineText()}でした。`;
+  }
+
   $("#exchangeGroups").innerHTML = groupRewards().map((group) => `
     <section class="exchange-group">
       <div class="exchange-group-title">
@@ -594,11 +700,13 @@ function renderExchange() {
       <div class="exchange-card-list">
         ${group.rewards.map((reward) => {
           const affordable = state.points >= reward.cost;
+          const enabled = exchangeAvailable && affordable;
+          const label = !exchangeAvailable ? "受付終了" : (affordable ? "交換する" : `あと${reward.cost - state.points}pt`);
           return `
-            <article class="exchange-card" style="--tint:${escapeHtml(reward.tint)}">
+            <article class="exchange-card ${!exchangeAvailable ? "period-ended" : ""}" style="--tint:${escapeHtml(reward.tint)}">
               <span class="exchange-icon">${escapeHtml(reward.icon)}</span>
               <div><div class="exchange-name">${escapeHtml(reward.name)}</div><div class="exchange-cost">${reward.cost}<small>pt</small></div></div>
-              <button class="exchange-button" type="button" data-reward-id="${escapeHtml(reward.id)}" ${affordable ? "" : "disabled"}>${affordable ? "交換する" : `あと${reward.cost - state.points}pt`}</button>
+              <button class="exchange-button" type="button" data-reward-id="${escapeHtml(reward.id)}" ${enabled ? "" : "disabled"}>${label}</button>
             </article>`;
         }).join("")}
       </div>
@@ -614,6 +722,10 @@ function getReward(id) {
 }
 
 function openExchangeConfirm(rewardId) {
+  if (!isExchangeUsePeriod()) {
+    showMessage("ポイント交換期間は終了しました", `ポイント交換は${exchangeUseDeadlineText()}です。`, "📅");
+    return;
+  }
   const reward = getReward(rewardId);
   if (!reward || state.points < reward.cost) return;
   pendingRewardId = rewardId;
@@ -624,6 +736,13 @@ function openExchangeConfirm(rewardId) {
 function confirmExchange() {
   const reward = getReward(pendingRewardId);
   if (!reward) return;
+  if (!isExchangeUsePeriod()) {
+    closeModal("exchangeModal");
+    pendingRewardId = null;
+    renderExchange();
+    showMessage("ポイント交換期間は終了しました", `ポイント交換は${exchangeUseDeadlineText()}です。`, "📅");
+    return;
+  }
   state = loadState();
   if (state.points < reward.cost) {
     closeModal("exchangeModal");
@@ -662,41 +781,67 @@ function confirmExchange() {
   pendingRewardId = null;
 }
 
+function isCouponExpired(coupon, date = new Date()) {
+  return Boolean(coupon && !coupon.used && !isExchangeUsePeriod(date));
+}
+
 function filteredCoupons() {
-  if (couponFilter === "active") return state.coupons.filter((coupon) => !coupon.used);
+  if (couponFilter === "active") return state.coupons.filter((coupon) => !coupon.used && !isCouponExpired(coupon));
   if (couponFilter === "used") return state.coupons.filter((coupon) => coupon.used);
   return state.coupons;
 }
 
 function renderCoupons() {
-  const activeCount = state.coupons.filter((coupon) => !coupon.used).length;
+  const useAvailable = isExchangeUsePeriod();
+  const activeCount = state.coupons.filter((coupon) => !coupon.used && !isCouponExpired(coupon)).length;
   $("#couponCountText").textContent = `${activeCount}枚使用可能`;
   $("#couponBadge").hidden = activeCount === 0;
   $("#couponBadge").textContent = activeCount > 99 ? "99+" : String(activeCount);
 
+  const deadlineNotice = $("#couponDeadlineNotice");
+  if (deadlineNotice) {
+    deadlineNotice.classList.toggle("ended", !useAvailable);
+    deadlineNotice.querySelector("b").textContent = useAvailable
+      ? `クーポン使用期限：${exchangeUseDeadlineText()}`
+      : "クーポン使用期間は終了しました";
+    deadlineNotice.querySelector("p").textContent = useAvailable
+      ? "期限を過ぎたクーポンはご利用いただけません。"
+      : `クーポンの使用期限は${exchangeUseDeadlineText()}でした。`;
+  }
+
   const items = filteredCoupons();
   const list = $("#couponList");
   if (!items.length) {
-    const text = state.coupons.length ? "この条件のクーポンはありません。" : "ポイントを交換すると、ここにクーポンが収納されます。";
+    const text = state.coupons.length
+      ? (couponFilter === "active" && !useAvailable ? "未使用のクーポンは使用期限を過ぎています。" : "この条件のクーポンはありません。")
+      : "ポイントを交換すると、ここにクーポンが収納されます。";
     list.innerHTML = `<div class="empty-state"><span>🎫</span><b>クーポンはありません</b><p>${text}</p></div>`;
     return;
   }
 
-  list.innerHTML = items.slice().reverse().map((coupon) => `
-    <article class="owned-coupon ${coupon.used ? "used" : ""}" style="--tint:${escapeHtml(coupon.tint || "#e8f8ff")}">
-      <span class="coupon-state">${coupon.used ? "使用済み" : "使用可能"}</span>
+  list.innerHTML = items.slice().reverse().map((coupon) => {
+    const expired = isCouponExpired(coupon);
+    const stateLabel = coupon.used ? "使用済み" : (expired ? "期限切れ" : "使用可能");
+    const actionButton = coupon.used
+      ? '<button class="secondary-button" type="button" disabled>使用済み</button>'
+      : (expired
+        ? '<button class="secondary-button" type="button" disabled>使用期限終了</button>'
+        : `<button class="danger-button" type="button" data-use-id="${escapeHtml(coupon.instanceId)}">このクーポンを使用する</button>`);
+    return `
+    <article class="owned-coupon ${coupon.used ? "used" : ""} ${expired ? "expired" : ""}" style="--tint:${escapeHtml(coupon.tint || "#e8f8ff")}">
+      <span class="coupon-state">${stateLabel}</span>
       <div class="owned-top">
         <span class="owned-icon">${escapeHtml(coupon.icon || "🎫")}</span>
         <div>
           <div class="owned-name">${escapeHtml(coupon.name || "クーポン")}</div>
           <div class="owned-date">交換：${formatDate(coupon.exchangedAt)}</div>
+          <div class="owned-date coupon-expiry">使用期限：${formatCampaignDate(CAMPAIGN_DATES.exchangeUseEnd)}</div>
           ${coupon.used ? `<div class="owned-date">使用：${formatDate(coupon.usedAt)}</div>` : ""}
         </div>
       </div>
-      <div class="owned-actions">
-        ${coupon.used ? '<button class="secondary-button" type="button" disabled>使用済み</button>' : `<button class="danger-button" type="button" data-use-id="${escapeHtml(coupon.instanceId)}">このクーポンを使用する</button>`}
-      </div>
-    </article>`).join("");
+      <div class="owned-actions">${actionButton}</div>
+    </article>`;
+  }).join("");
 
   $$('[data-use-id]').forEach((button) => {
     button.addEventListener("click", () => openUseConfirm(button.dataset.useId));
@@ -704,6 +849,10 @@ function renderCoupons() {
 }
 
 function openUseConfirm(instanceId) {
+  if (!isExchangeUsePeriod()) {
+    showMessage("クーポン使用期間は終了しました", `クーポンの使用期限は${exchangeUseDeadlineText()}です。`, "📅");
+    return;
+  }
   const coupon = state.coupons.find((item) => item.instanceId === instanceId);
   if (!coupon || coupon.used) return;
   pendingUseId = instanceId;
@@ -712,6 +861,13 @@ function openUseConfirm(instanceId) {
 }
 
 function confirmUse() {
+  if (!isExchangeUsePeriod()) {
+    closeModal("useModal");
+    pendingUseId = null;
+    renderCoupons();
+    showMessage("クーポン使用期間は終了しました", `クーポンの使用期限は${exchangeUseDeadlineText()}です。`, "📅");
+    return;
+  }
   const coupon = state.coupons.find((item) => item.instanceId === pendingUseId);
   if (!coupon || coupon.used) return;
   coupon.used = true;
@@ -978,6 +1134,10 @@ async function scanQrImage(file) {
 }
 
 function handleClaimButton() {
+  if (!isEarnPeriod()) {
+    showMessage("ポイント受け取り期間は終了しました", `ポイントの受け取りは${earnDeadlineText()}です。`, "📅");
+    return;
+  }
   if (pendingEarnAction) claimPoints();
   else openQrScanner();
 }
@@ -1052,8 +1212,23 @@ function describeGeolocationError(error) {
 
 async function claimPoints() {
   const action = pendingEarnAction;
+  if (!isEarnPeriod()) {
+    clearPendingEarn();
+    renderAll();
+    showMessage("ポイント受け取り期間は終了しました", `ポイントの受け取りは${earnDeadlineText()}です。`, "📅");
+    return;
+  }
   if (!action) {
     openQrScanner();
+    return;
+  }
+  if (!isBusinessHours()) {
+    renderAll();
+    showMessage(
+      "営業時間外です",
+      `ポイント加算は${businessHoursText()}の間のみ利用できます。ページや保有ポイント、クーポンはそのまま確認できます。`,
+      "🕙"
+    );
     return;
   }
   if (!pendingEarnExpiresAt || pendingEarnExpiresAt <= Date.now()) {
@@ -1106,6 +1281,28 @@ async function claimPoints() {
         "店舗周辺を確認できませんでした",
         `測定位置は店舗基準地点から約${Math.round(distance)}m、測位精度は約${Math.round(accuracy)}mでした。端末の誤差範囲に店舗が含まれていないため、今回は加算できません。QR認証は残っているので再試行できます。`,
         "📍"
+      );
+      return;
+    }
+
+    if (!isEarnPeriod()) {
+      clearPendingEarn();
+      renderAll();
+      showMessage(
+        "ポイント受け取り期間が終了しました",
+        `ポイントの受け取りは${earnDeadlineText()}です。今回は加算されていません。`,
+        "📅"
+      );
+      cleanUrl();
+      return;
+    }
+
+    if (!isBusinessHours()) {
+      renderAll();
+      showMessage(
+        "営業時間外になりました",
+        `ポイント加算は${businessHoursText()}の間のみ利用できます。今回は加算されていません。`,
+        "🕙"
       );
       return;
     }

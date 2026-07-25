@@ -7,7 +7,7 @@
   <meta name="color-scheme" content="light">
   <meta name="description" content="テクモピア公津の杜店 デジタルポイントカード">
   <title>TECMOPIA デジタルポイントカード</title>
-  <link rel="stylesheet" href="./styles.css?v=20260724-location02">
+  <link rel="stylesheet" href="./styles.css?v=20260725-deadline01">
   <script>
     (() => {
       try {
@@ -32,7 +32,7 @@
   </script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
   <script src="gas-config.js"></script>
-  <script src="./app.js?v=20260724-gas05" defer></script>
+  <script src="./app.js?v=20260725-deadline01" defer></script>
 </head>
 <body>
   <div class="page-sky" aria-hidden="true">
@@ -85,6 +85,12 @@
         </div>
       </section>
 
+      <aside class="campaign-period" aria-label="実施期間のご案内">
+        <div class="campaign-period-title"><span>📅</span><b>実施期間のご案内</b></div>
+        <div class="campaign-period-row"><span>ポイント受け取り</span><strong>2026年9月20日まで</strong></div>
+        <div class="campaign-period-row"><span>ポイント交換・クーポン利用</span><strong>2026年9月30日まで</strong></div>
+      </aside>
+
       <section id="homeActionBanner" class="action-banner" hidden>
         <div class="action-banner-icon" id="homeActionIcon">📍</div>
         <div>
@@ -125,8 +131,28 @@
 
       <aside class="info-callout">
         <span>📱</span>
-        <div><b>この端末があなたのポイントカードです</b><p>同じブラウザで開くとポイントとクーポンを引き継げます。ブラウザデータを削除すると消える場合があります。</p></div>
+        <div><b>この端末があなたのポイントカードです</b><p>ポイントとクーポンは、この端末の同じブラウザ内に保存されます。</p></div>
       </aside>
+
+      <details class="customer-notice">
+        <summary>
+          <span class="customer-notice-icon" aria-hidden="true">!</span>
+          <span><small>タップしてご確認ください</small><b>注意事項</b></span>
+          <i aria-hidden="true">›</i>
+        </summary>
+        <div class="customer-notice-body">
+          <p class="customer-notice-lead">本サービスをご利用の際は、以下の内容をご確認・ご了承のうえご利用ください。</p>
+          <ul>
+            <li>ポイントとクーポンは、お使いの端末・ブラウザ内に保存されます。端末の変更・故障、ブラウザの変更、閲覧履歴やサイトデータの削除などにより消失した場合、<b>ポイント・クーポンの復旧や再発行はできません。</b></li>
+            <li>ポイントおよびクーポンの譲渡・合算・換金はできません。</li>
+            <li>不正な方法によるポイント・クーポンの取得や利用が確認された場合、無効とすることがあります。</li>
+            <li>通信状況、端末・ブラウザの状態、システムメンテナンスなどにより、一時的にご利用いただけないことがあります。</li>
+            <li>ポイント付与条件、交換に必要なポイント数、特典内容、利用方法、実施期間などは、<b>事前の告知なく変更または終了する場合があります。</b></li>
+            <li>ポイントの受け取りは<b>2026年9月20日まで</b>です。加算は店舗周辺かつ<b>10:00～20:00</b>の間のみご利用いただけます。</li>
+            <li>ポイント交換および交換したクーポンの使用期限は、<b>2026年9月30日まで</b>です。期限を過ぎたポイントの交換、クーポンの使用はできません。</li>
+          </ul>
+        </div>
+      </details>
     </section>
 
     <section id="earnScreen" class="screen" aria-labelledby="earnTitle">
@@ -134,6 +160,10 @@
         <div><span class="section-kicker">EARN POINTS</span><h1 id="earnTitle">ポイントを貯める</h1></div>
         <span class="blue-chip">店舗限定</span>
       </div>
+
+      <aside class="deadline-notice earn-deadline">
+        <span>📅</span><div><b>ポイント受け取りは2026年9月20日まで</b><p>受付時間は10:00～20:00です。</p></div>
+      </aside>
 
       <section id="claimPanel" class="claim-panel">
         <div class="claim-visual" id="claimIcon">▣</div>
@@ -190,6 +220,10 @@
         <div><small>ポイントで選べる</small><strong>全9種類の特典</strong><p>交換した特典はクーポンタブに収納されます。</p></div>
       </div>
 
+      <aside id="exchangeDeadlineNotice" class="deadline-notice">
+        <span>📅</span><div><b>ポイント交換期限：2026年9月30日まで</b><p>期限内に交換したクーポンも、同じ日までにご利用ください。</p></div>
+      </aside>
+
       <div id="exchangeGroups" class="exchange-groups"></div>
     </section>
 
@@ -205,7 +239,11 @@
         <button class="coupon-tab" type="button" data-coupon-filter="all" role="tab" aria-selected="false">すべて</button>
       </div>
 
-      <aside class="coupon-note"><span>!</span><p>クーポンは必ずスタッフの目の前で使用してください。使用後は元に戻せません。</p></aside>
+      <aside id="couponDeadlineNotice" class="deadline-notice">
+        <span>📅</span><div><b>クーポン使用期限：2026年9月30日まで</b><p>期限を過ぎたクーポンはご利用いただけません。</p></div>
+      </aside>
+
+      <aside class="coupon-note"><span>!</span><p>クーポンは使用期限内に、必ずスタッフの目の前で使用してください。使用後は元に戻せません。</p></aside>
       <div id="couponList" class="coupon-list"></div>
     </section>
   </main>
@@ -254,7 +292,7 @@
       <span class="modal-kicker">POINT EXCHANGE</span>
       <h2 id="exchangeModalTitle">この特典と交換しますか？</h2>
       <div id="exchangePreview" class="modal-preview"></div>
-      <p class="modal-note">交換後はクーポンタブに収納されます。</p>
+      <p class="modal-note">交換後はクーポンタブに収納されます。使用期限は2026年9月30日までです。</p>
       <div class="modal-actions">
         <button id="confirmExchangeButton" class="primary-button" type="button"><span class="button-label">交換する</span><span class="button-spinner"></span></button>
         <button class="secondary-button" type="button" data-close-modal="exchangeModal">キャンセル</button>
@@ -268,7 +306,7 @@
       <span class="staff-check-label">STAFF CHECK</span>
       <h2 id="useModalTitle">クーポンを使用しますか？</h2>
       <div id="usePreview" class="modal-preview"></div>
-      <div class="warning-box"><b>スタッフに画面を見せてから押してください</b><span>使用後は取り消しできません。</span></div>
+      <div class="warning-box"><b>スタッフに画面を見せてから押してください</b><span>使用期限は2026年9月30日までです。使用後は取り消しできません。</span></div>
       <div class="modal-actions">
         <button id="confirmUseButton" class="danger-button" type="button">スタッフ確認済み・使用する</button>
         <button class="secondary-button" type="button" data-close-modal="useModal">キャンセル</button>
@@ -286,6 +324,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <div style="position:fixed;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:20;font:700 9px/1.2 system-ui;color:rgba(0,74,130,.45);pointer-events:none">BUILD GAS-ADMIN-04</div>
+  <div style="position:fixed;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:20;font:700 9px/1.2 system-ui;color:rgba(0,74,130,.45);pointer-events:none">BUILD DEADLINE-01</div>
 </body>
 </html>
