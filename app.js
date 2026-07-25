@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.25-DEADLINE-01";
+const APP_BUILD = "2026.07.25-COUPON-BANNERS-01";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -274,15 +274,15 @@ const EARN_ACTIONS = Object.freeze({
 });
 
 const REWARDS = Object.freeze([
-  { id: "crane_plus1", name: "クレーンゲーム1回増量券", cost: 3, icon: "🕹️", type: "crane", tint: "#e4f7ff" },
-  { id: "medal_10", name: "ゲームメダル10枚引換券", cost: 3, icon: "🪙", type: "medal", tint: "#fff6d8" },
-  { id: "crane_free1", name: "クレーンゲーム1回無料券", cost: 6, icon: "🎮", type: "crane", tint: "#e4f7ff" },
-  { id: "medal_30", name: "ゲームメダル30枚引換券", cost: 6, icon: "🪙", type: "medal", tint: "#fff6d8" },
-  { id: "crane_500_7", name: "クレーンゲーム500円で7PLAY券", cost: 6, icon: "7️⃣", type: "crane", tint: "#e9f6ff" },
-  { id: "crane_free3", name: "クレーンゲーム3回無料券", cost: 15, icon: "🏆", type: "crane", tint: "#e5f8ff" },
-  { id: "medal_99", name: "ゲームメダル99枚引換券", cost: 15, icon: "✨", type: "medal", tint: "#fff4ce" },
-  { id: "prize_choice", name: "お好きな景品と交換券", cost: 50, icon: "🎁", type: "prize", tint: "#f2eaff" },
-  { id: "medal_3333", name: "ゲームメダル3,333枚引換券", cost: 50, icon: "👑", type: "medal", tint: "#fff1c2" }
+  { id: "crane_plus1", name: "クレーンゲーム1回増量券", cost: 3, icon: "🕹️", type: "crane", tint: "#e4f7ff", banner: "./images/coupons/coupon_crane_bonus_1play.png" },
+  { id: "medal_10", name: "ゲームメダル10枚引換券", cost: 3, icon: "🪙", type: "medal", tint: "#fff6d8", banner: "./images/coupons/coupon_medal_10.png" },
+  { id: "crane_free1", name: "クレーンゲーム1回無料券", cost: 6, icon: "🎮", type: "crane", tint: "#e4f7ff", banner: "./images/coupons/coupon_crane_free_1play.png" },
+  { id: "medal_30", name: "ゲームメダル30枚引換券", cost: 6, icon: "🪙", type: "medal", tint: "#fff6d8", banner: "./images/coupons/coupon_medal_30.png" },
+  { id: "crane_500_7", name: "クレーンゲーム500円で7PLAY券", cost: 6, icon: "7️⃣", type: "crane", tint: "#e9f6ff", banner: "./images/coupons/coupon_crane_500yen_7play.png" },
+  { id: "crane_free3", name: "クレーンゲーム3回無料券", cost: 15, icon: "🏆", type: "crane", tint: "#e5f8ff", banner: "./images/coupons/coupon_crane_free_3play.png" },
+  { id: "medal_99", name: "ゲームメダル99枚引換券", cost: 15, icon: "✨", type: "medal", tint: "#fff4ce", banner: "./images/coupons/coupon_medal_99.png" },
+  { id: "prize_choice", name: "お好きな景品と交換券", cost: 50, icon: "🎁", type: "prize", tint: "#f2eaff", banner: "./images/coupons/coupon_special_prize.png" },
+  { id: "medal_3333", name: "ゲームメダル3,333枚引換券", cost: 50, icon: "👑", type: "medal", tint: "#fff1c2", banner: "./images/coupons/coupon_medal_3333.png" }
 ]);
 
 const DEFAULT_STATE = Object.freeze({
@@ -721,6 +721,12 @@ function getReward(id) {
   return REWARDS.find((reward) => reward.id === id) || null;
 }
 
+function getCouponBanner(coupon) {
+  if (!coupon) return "";
+  if (typeof coupon.banner === "string" && coupon.banner) return coupon.banner;
+  return getReward(coupon.couponId)?.banner || "";
+}
+
 function openExchangeConfirm(rewardId) {
   if (!isExchangeUsePeriod()) {
     showMessage("ポイント交換期間は終了しました", `ポイント交換は${exchangeUseDeadlineText()}です。`, "📅");
@@ -729,7 +735,7 @@ function openExchangeConfirm(rewardId) {
   const reward = getReward(rewardId);
   if (!reward || state.points < reward.cost) return;
   pendingRewardId = rewardId;
-  $("#exchangePreview").innerHTML = `<div class="big-icon">${escapeHtml(reward.icon)}</div><b>${escapeHtml(reward.name)}</b><div class="preview-cost">${reward.cost}<small>pt</small></div>`;
+  $("#exchangePreview").innerHTML = `${reward.banner ? `<img class="modal-coupon-banner" src="${escapeHtml(reward.banner)}" alt="${escapeHtml(reward.name)}" loading="lazy" decoding="async">` : `<div class="big-icon">${escapeHtml(reward.icon)}</div>`}<b>${escapeHtml(reward.name)}</b><div class="preview-cost">${reward.cost}<small>pt</small></div>`;
   openModal("exchangeModal");
 }
 
@@ -761,6 +767,7 @@ function confirmExchange() {
     icon: reward.icon,
     type: reward.type,
     tint: reward.tint,
+    banner: reward.banner,
     exchangedAt: new Date().toISOString(),
     used: false,
     usedAt: null
@@ -821,6 +828,7 @@ function renderCoupons() {
 
   list.innerHTML = items.slice().reverse().map((coupon) => {
     const expired = isCouponExpired(coupon);
+    const banner = getCouponBanner(coupon);
     const stateLabel = coupon.used ? "使用済み" : (expired ? "期限切れ" : "使用可能");
     const actionButton = coupon.used
       ? '<button class="secondary-button" type="button" disabled>使用済み</button>'
@@ -829,17 +837,20 @@ function renderCoupons() {
         : `<button class="danger-button" type="button" data-use-id="${escapeHtml(coupon.instanceId)}">このクーポンを使用する</button>`);
     return `
     <article class="owned-coupon ${coupon.used ? "used" : ""} ${expired ? "expired" : ""}" style="--tint:${escapeHtml(coupon.tint || "#e8f8ff")}">
+      ${banner ? `<div class="coupon-banner-wrap"><img class="coupon-banner-image" src="${escapeHtml(banner)}" alt="${escapeHtml(coupon.name || "クーポン")}" loading="lazy" decoding="async"></div>` : ""}
       <span class="coupon-state">${stateLabel}</span>
-      <div class="owned-top">
-        <span class="owned-icon">${escapeHtml(coupon.icon || "🎫")}</span>
-        <div>
-          <div class="owned-name">${escapeHtml(coupon.name || "クーポン")}</div>
-          <div class="owned-date">交換：${formatDate(coupon.exchangedAt)}</div>
-          <div class="owned-date coupon-expiry">使用期限：${formatCampaignDate(CAMPAIGN_DATES.exchangeUseEnd)}</div>
-          ${coupon.used ? `<div class="owned-date">使用：${formatDate(coupon.usedAt)}</div>` : ""}
+      <div class="owned-coupon-body">
+        <div class="owned-top">
+          <span class="owned-icon">${escapeHtml(coupon.icon || "🎫")}</span>
+          <div>
+            <div class="owned-name">${escapeHtml(coupon.name || "クーポン")}</div>
+            <div class="owned-date">交換：${formatDate(coupon.exchangedAt)}</div>
+            <div class="owned-date coupon-expiry">使用期限：${formatCampaignDate(CAMPAIGN_DATES.exchangeUseEnd)}</div>
+            ${coupon.used ? `<div class="owned-date">使用：${formatDate(coupon.usedAt)}</div>` : ""}
+          </div>
         </div>
+        <div class="owned-actions">${actionButton}</div>
       </div>
-      <div class="owned-actions">${actionButton}</div>
     </article>`;
   }).join("");
 
@@ -856,7 +867,8 @@ function openUseConfirm(instanceId) {
   const coupon = state.coupons.find((item) => item.instanceId === instanceId);
   if (!coupon || coupon.used) return;
   pendingUseId = instanceId;
-  $("#usePreview").innerHTML = `<div class="big-icon">${escapeHtml(coupon.icon || "🎫")}</div><b>${escapeHtml(coupon.name || "クーポン")}</b>`;
+  const banner = getCouponBanner(coupon);
+  $("#usePreview").innerHTML = `${banner ? `<img class="modal-coupon-banner" src="${escapeHtml(banner)}" alt="${escapeHtml(coupon.name || "クーポン")}" loading="lazy" decoding="async">` : `<div class="big-icon">${escapeHtml(coupon.icon || "🎫")}</div>`}<b>${escapeHtml(coupon.name || "クーポン")}</b>`;
   openModal("useModal");
 }
 
