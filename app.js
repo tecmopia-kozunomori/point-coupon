@@ -1,11 +1,12 @@
 "use strict";
 
-const APP_BUILD = "2026.07.25-COUPON-NOTES-02";
+const APP_BUILD = "2026.07.25-SERVER-AUTH-01";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
 
 const DEVICE_ID_KEY = "tecmopia_device_id_v1";
+const DEVICE_SECRET_KEY = "tecmopia_device_secret_v1";
 const RESET_VERSION_KEY = "tecmopia_reset_version_v1";
 const PAGE_VIEW_DATE_KEY = "tecmopia_page_view_date_v1";
 const LOCATION_NOTICE_SESSION_KEY = "tecmopia_location_notice_confirmed_v1";
@@ -13,7 +14,7 @@ const GAS_WEB_APP_URL = String(window.TECMOPIA_GAS_URL || "").trim();
 const GAS_PLACEHOLDER = "PASTE_GAS_WEB_APP_URL_HERE";
 const GAS_ENABLED = /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(?:\?.*)?$/i.test(GAS_WEB_APP_URL)
   && !GAS_WEB_APP_URL.includes(GAS_PLACEHOLDER);
-const GAS_JSONP_TIMEOUT_MS = 10000;
+const GAS_JSONP_TIMEOUT_MS = 20000;
 const gasRequestKeepAlive = new Set();
 
 function getDeviceId() {
@@ -26,6 +27,21 @@ function getDeviceId() {
     return id;
   } catch (error) {
     return `tp_session_${Math.random().toString(36).slice(2, 14)}`;
+  }
+}
+
+function getDeviceSecret() {
+  try {
+    let secret = localStorage.getItem(DEVICE_SECRET_KEY);
+    if (!secret) {
+      const random = window.crypto?.randomUUID?.().replaceAll("-", "")
+        || `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+      secret = `sec_${random}${Math.random().toString(36).slice(2, 12)}`;
+      localStorage.setItem(DEVICE_SECRET_KEY, secret);
+    }
+    return secret;
+  } catch (error) {
+    return `sec_session_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
   }
 }
 
@@ -143,43 +159,64 @@ function gasJsonp(action, params = {}) {
   });
 }
 
-async function checkRemoteReset({ showNotice = false } = {}) {
-  if (!GAS_ENABLED) return;
-  try {
-    const config = await gasJsonp("config");
-    if (!config?.ok) return;
-    const remoteVersion = Number(config.resetVersion || 0);
-    const localVersion = Number(localStorage.getItem(RESET_VERSION_KEY) || 0);
-    if (!localVersion) {
-      localStorage.setItem(RESET_VERSION_KEY, String(remoteVersion));
-      return;
-    }
-    if (remoteVersion <= localVersion) return;
+function serverJsonp(action, params = {}) {
+  return gasJsonp(action, {
+    deviceId: getDeviceId(),
+    deviceSecret: getDeviceSecret(),
+    ...params
+  });
+}
 
-    const deviceId = getDeviceId();
-    localStorage.removeItem(STORAGE_KEY);
-    sessionStorage.removeItem(QR_SESSION_KEY);
-    sessionStorage.removeItem(QR_INVALID_KEY);
-    localStorage.setItem(RESET_VERSION_KEY, String(remoteVersion));
-    state = clone(DEFAULT_STATE);
-    pendingEarnAction = null;
-    pendingEarnExpiresAt = 0;
-    renderAll();
-    sendGasEvent("client_reset_applied", {
-      eventId: makeEventId("client_reset"),
-      itemId: String(remoteVersion),
-      itemName: "管理者リセットを端末へ反映",
-      balance: 0
-    });
-    if (showNotice) {
-      showMessage("ポイントカードをリセットしました", "管理者によるリセットをこの端末へ反映しました。", "🔄");
-    } else {
-      showToast("管理者リセットを反映しました", "success");
-    }
-    return deviceId;
+function normalizeServerState(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    points: Number.isFinite(Number(source.points)) ? Math.max(0, Number(source.points)) : 0,
+    lastCheckinDate: typeof source.lastCheckinDate === "string" ? source.lastCheckinDate : "",
+    coupons: Array.isArray(source.coupons) ? source.coupons.filter(Boolean) : [],
+    transactions: Array.isArray(source.transactions) ? source.transactions.filter(Boolean).slice(-100) : []
+  };
+}
+
+function applyServerState(nextState, { render = true } = {}) {
+  state = normalizeServerState(nextState);
+  saveState(); // localStorageは表示用キャッシュ。加算・交換の正本ではありません。
+  serverReady = true;
+  if (render) renderAll();
+}
+
+function serverErrorText(result, fallback = "処理を完了できませんでした。") {
+  if (result?.message) return result.message;
+  return fallback;
+}
+
+async function syncServerState({ showNotice = false } = {}) {
+  if (!GAS_ENABLED || serverSyncing) return false;
+  serverSyncing = true;
+  try {
+    const result = await serverJsonp("bootstrap");
+    if (!result?.ok || !result.state) throw new Error(serverErrorText(result, "ポイント情報を取得できませんでした。"));
+    applyServerState(result.state);
+    if (showNotice && result.created) showToast("新しいポイントカードを登録しました", "success");
+    return true;
   } catch (error) {
-    console.warn("GAS設定の確認に失敗しました。", error);
+    console.error("サーバー同期に失敗しました。", error);
+    serverReady = false;
+    renderAll();
+    if (showNotice) {
+      showMessage(
+        "ポイント情報を確認できませんでした",
+        "通信状況を確認してページを再読み込みしてください。画面には前回取得した情報を表示していますが、ポイント加算・交換・クーポン使用はできません。",
+        "📡"
+      );
+    }
+    return false;
+  } finally {
+    serverSyncing = false;
   }
+}
+
+async function checkRemoteReset({ showNotice = false } = {}) {
+  return syncServerState({ showNotice });
 }
 
 const STORE = Object.freeze({
@@ -307,6 +344,8 @@ let qrScanner = null;
 let qrScannerActive = false;
 let qrExpiryTimer = null;
 let scannerResultLocked = false;
+let serverReady = false;
+let serverSyncing = false;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -591,6 +630,22 @@ function renderClaimPanel() {
     clearPendingEarn();
   }
 
+  if (!GAS_ENABLED || !serverReady) {
+    panel.classList.add("closed");
+    $("#claimIcon").textContent = "📡";
+    $("#claimBadge").textContent = GAS_ENABLED ? "データ確認中" : "サーバー未設定";
+    $("#claimTitle").textContent = GAS_ENABLED ? "ポイント情報を確認しています" : "ポイント管理サーバーに接続できません";
+    $("#claimDescription").textContent = GAS_ENABLED
+      ? "通信が完了するとポイント加算ボタンを利用できます。"
+      : "gas-config.js のウェブアプリURLをご確認ください。";
+    claimButton.querySelector(".button-label").textContent = "現在は操作できません";
+    $("#claimButtonNote").textContent = "画面の閲覧はできますが、ポイント加算にはサーバー接続が必要です。";
+    claimButton.disabled = true;
+    $("#homeActionBanner").hidden = true;
+    stopExpiryTimer();
+    return;
+  }
+
   if (!isEarnPeriod()) {
     clearPendingEarn();
     panel.classList.add("closed", "period-ended");
@@ -706,8 +761,8 @@ function renderExchange() {
       <div class="exchange-card-list">
         ${group.rewards.map((reward) => {
           const affordable = state.points >= reward.cost;
-          const enabled = exchangeAvailable && affordable;
-          const label = !exchangeAvailable ? "受付終了" : (affordable ? "交換する" : `あと${reward.cost - state.points}pt`);
+          const enabled = serverReady && exchangeAvailable && affordable;
+          const label = !serverReady ? "確認中" : (!exchangeAvailable ? "受付終了" : (affordable ? "交換する" : `あと${reward.cost - state.points}pt`));
           return `
             <article class="exchange-card ${!exchangeAvailable ? "period-ended" : ""}" style="--tint:${escapeHtml(reward.tint)}">
               ${reward.banner ? `<div class="exchange-banner-wrap"><img class="exchange-banner-image" src="${escapeHtml(reward.banner)}" alt="${escapeHtml(reward.name)}" loading="lazy" decoding="async" width="750" height="250"></div>` : ""}
@@ -760,6 +815,10 @@ function couponNoticeHtml(item, extraClass = "") {
 }
 
 function openExchangeConfirm(rewardId) {
+  if (!serverReady) {
+    showMessage("ポイント情報を確認できません", "通信状況を確認してページを再読み込みしてください。", "📡");
+    return;
+  }
   if (!isExchangeUsePeriod()) {
     showMessage("ポイント交換期間は終了しました", `ポイント交換は${exchangeUseDeadlineText()}です。`, "📅");
     return;
@@ -771,9 +830,14 @@ function openExchangeConfirm(rewardId) {
   openModal("exchangeModal");
 }
 
-function confirmExchange() {
+async function confirmExchange() {
   const reward = getReward(pendingRewardId);
   if (!reward) return;
+  if (!serverReady) {
+    closeModal("exchangeModal");
+    showMessage("ポイント情報を確認できません", "通信状況を確認してページを再読み込みしてください。", "📡");
+    return;
+  }
   if (!isExchangeUsePeriod()) {
     closeModal("exchangeModal");
     pendingRewardId = null;
@@ -781,45 +845,34 @@ function confirmExchange() {
     showMessage("ポイント交換期間は終了しました", `ポイント交換は${exchangeUseDeadlineText()}です。`, "📅");
     return;
   }
-  state = loadState();
-  if (state.points < reward.cost) {
-    closeModal("exchangeModal");
-    showToast("ポイントが不足しています", "error");
-    renderAll();
-    return;
-  }
+
+  const button = $("#confirmExchangeButton");
   const before = state.points;
-  state.points -= reward.cost;
-  const couponInstanceId = `${reward.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  state.coupons.push({
-    instanceId: couponInstanceId,
-    couponId: reward.id,
-    name: reward.name,
-    cost: reward.cost,
-    icon: reward.icon,
-    type: reward.type,
-    tint: reward.tint,
-    banner: reward.banner,
-    notice: reward.notice || "",
-    noticeDetail: reward.noticeDetail || "",
-    exchangedAt: new Date().toISOString(),
-    used: false,
-    usedAt: null
-  });
-  addTransaction({ kind: "exchange", name: reward.name, points: -reward.cost, icon: reward.icon });
-  saveState();
-  closeModal("exchangeModal");
-  renderAll(false);
-  animatePoints(before, state.points, `-${reward.cost}`);
-  showToast("クーポンタブに収納しました", "success");
-  sendGasEvent("exchange", {
-    itemId: reward.id,
-    itemName: reward.name,
-    points: -reward.cost,
-    balance: state.points,
-    couponInstanceId
-  });
-  pendingRewardId = null;
+  button.disabled = true;
+  button.classList.add("btn-loading");
+  try {
+    const result = await serverJsonp("exchange", {
+      rewardId: reward.id,
+      requestId: makeEventId("exchange")
+    });
+    if (result?.state) applyServerState(result.state, { render: false });
+    if (!result?.ok) {
+      throw new Error(serverErrorText(result, "ポイント交換を完了できませんでした。"));
+    }
+    closeModal("exchangeModal");
+    renderAll(false);
+    animatePoints(before, state.points, `-${reward.cost}`);
+    showToast("クーポンタブに収納しました", "success");
+    pendingRewardId = null;
+  } catch (error) {
+    console.error("ポイント交換に失敗しました。", error);
+    closeModal("exchangeModal");
+    renderAll();
+    showMessage("ポイント交換できませんでした", error.message || "通信状況を確認して再度お試しください。", "⚠️");
+  } finally {
+    button.classList.remove("btn-loading");
+    button.disabled = false;
+  }
 }
 
 function isCouponExpired(coupon, date = new Date()) {
@@ -895,6 +948,10 @@ function renderCoupons() {
 }
 
 function openUseConfirm(instanceId) {
+  if (!serverReady) {
+    showMessage("クーポン情報を確認できません", "通信状況を確認してページを再読み込みしてください。", "📡");
+    return;
+  }
   if (!isExchangeUsePeriod()) {
     showMessage("クーポン使用期間は終了しました", `クーポンの使用期限は${exchangeUseDeadlineText()}です。`, "📅");
     return;
@@ -907,7 +964,12 @@ function openUseConfirm(instanceId) {
   openModal("useModal");
 }
 
-function confirmUse() {
+async function confirmUse() {
+  if (!serverReady) {
+    closeModal("useModal");
+    showMessage("クーポン情報を確認できません", "通信状況を確認してページを再読み込みしてください。", "📡");
+    return;
+  }
   if (!isExchangeUsePeriod()) {
     closeModal("useModal");
     pendingUseId = null;
@@ -917,20 +979,28 @@ function confirmUse() {
   }
   const coupon = state.coupons.find((item) => item.instanceId === pendingUseId);
   if (!coupon || coupon.used) return;
-  coupon.used = true;
-  coupon.usedAt = new Date().toISOString();
-  saveState();
-  closeModal("useModal");
-  renderCoupons();
-  showToast("クーポンを使用済みにしました", "success");
-  sendGasEvent("use", {
-    itemId: coupon.couponId,
-    itemName: coupon.name,
-    points: 0,
-    balance: state.points,
-    couponInstanceId: coupon.instanceId
-  });
-  pendingUseId = null;
+
+  const button = $("#confirmUseButton");
+  button.disabled = true;
+  try {
+    const result = await serverJsonp("useCoupon", {
+      couponInstanceId: coupon.instanceId,
+      requestId: makeEventId("use")
+    });
+    if (result?.state) applyServerState(result.state, { render: false });
+    if (!result?.ok) throw new Error(serverErrorText(result, "クーポンを使用済みにできませんでした。"));
+    closeModal("useModal");
+    renderAll();
+    showToast("クーポンを使用済みにしました", "success");
+    pendingUseId = null;
+  } catch (error) {
+    console.error("クーポン使用処理に失敗しました。", error);
+    closeModal("useModal");
+    renderAll();
+    showMessage("クーポンを使用できませんでした", error.message || "通信状況を確認して再度お試しください。", "⚠️");
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function normalizePathname(pathname) {
@@ -1199,6 +1269,10 @@ function confirmLocationNotice() {
 }
 
 function handleClaimButton() {
+  if (!serverReady) {
+    showMessage("ポイント情報を確認できません", "通信状況を確認してページを再読み込みしてください。", "📡");
+    return;
+  }
   if (!isEarnPeriod()) {
     showMessage("ポイント受け取り期間は終了しました", `ポイントの受け取りは${earnDeadlineText()}です。`, "📅");
     return;
@@ -1284,6 +1358,10 @@ function describeGeolocationError(error) {
 
 async function claimPoints() {
   const action = pendingEarnAction;
+  if (!serverReady) {
+    showMessage("ポイント情報を確認できません", "通信状況を確認してページを再読み込みしてください。", "📡");
+    return;
+  }
   if (!isEarnPeriod()) {
     clearPendingEarn();
     renderAll();
@@ -1379,34 +1457,32 @@ async function claimPoints() {
       return;
     }
 
-    state = loadState();
-    if (action.oncePerDay && state[action.dateField] === getTodayKey()) {
-      clearPendingEarn();
-      renderAll();
-      showMessage("本日は取得済みです", "来店チェックインは1日1回までです。", "✅");
-      cleanUrl();
-      return;
+    const before = state.points;
+    const result = await serverJsonp("claim", {
+      token: action.token,
+      latitude,
+      longitude,
+      accuracy,
+      requestId: makeEventId("claim")
+    });
+
+    if (result?.state) applyServerState(result.state, { render: false });
+    if (!result?.ok) {
+      if (result?.code === "ALREADY_CLAIMED") {
+        clearPendingEarn();
+        renderAll();
+        showMessage("本日は取得済みです", result.message || "来店チェックインは1日1回までです。", "✅");
+        cleanUrl();
+        return;
+      }
+      throw new Error(serverErrorText(result, "ポイントを加算できませんでした。"));
     }
 
-    const before = state.points;
-    state.points += action.points;
-    if (action.oncePerDay) state[action.dateField] = getTodayKey();
-    addTransaction({ kind: "earn", name: action.name, points: action.points, icon: action.icon });
-    saveState();
     renderAll(false);
-    animatePoints(before, state.points, `+${action.points}`);
+    animatePoints(before, state.points, `+${Number(result.added || action.points)}`);
     clearPendingEarn();
-    const locationMode = accuracy <= FINE_ACCURACY_METERS ? "高精度測位" : "館内測位";
-    sendGasEvent("earn", {
-      itemId: action.token,
-      itemName: action.name,
-      points: action.points,
-      balance: state.points,
-      distance: Math.round(distance),
-      accuracy: Math.round(accuracy),
-      locationMode
-    });
-    showMessage("ポイントGET！", `${action.name}で${action.points}ポイント獲得しました。\n${locationMode}：店舗から約${Math.round(distance)}m・測位精度約${Math.round(accuracy)}mで確認しました。`, "🌊");
+    const locationMode = result.locationMode || (accuracy <= FINE_ACCURACY_METERS ? "高精度測位" : "館内測位");
+    showMessage("ポイントGET！", `${action.name}で${Number(result.added || action.points)}ポイント獲得しました。\n${locationMode}：店舗から約${Number(result.distance ?? Math.round(distance))}m・測位精度約${Number(result.accuracy ?? Math.round(accuracy))}mで確認しました。`, "🌊");
     cleanUrl();
   } catch (error) {
     console.error("位置情報確認に失敗しました。", error);
@@ -1479,6 +1555,7 @@ function initEvents() {
     if (event.key !== STORAGE_KEY) return;
     state = loadState();
     renderAll();
+    syncServerState();
   });
 
   document.addEventListener("visibilitychange", () => {
@@ -1486,20 +1563,20 @@ function initEvents() {
       state = loadState();
       if (!pendingEarnAction) restorePendingEarn();
       renderAll();
-      checkRemoteReset();
+      syncServerState();
     } else if (qrScannerActive) {
       stopQrScanner();
     }
   });
 }
 
-function init() {
+async function init() {
   initEvents();
   renderAll();
+  const synced = await syncServerState({ showNotice: true });
   processQrAccess();
-  logDailyPageView();
-  checkRemoteReset({ showNotice: true });
-  setInterval(() => checkRemoteReset(), 5 * 60 * 1000);
+  if (synced) logDailyPageView();
+  setInterval(() => syncServerState(), 2 * 60 * 1000);
 }
 
 if (document.readyState === "loading") {
