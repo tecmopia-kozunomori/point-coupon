@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.25-COUPON-BANNERS-01";
+const APP_BUILD = "2026.07.25-BANNER-PREVIEW-02";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -532,9 +532,12 @@ function renderProgress() {
 function rewardMiniCard(reward) {
   return `
     <article class="reward-mini" style="--tint:${escapeHtml(reward.tint)}">
-      <span class="reward-mini-icon">${escapeHtml(reward.icon)}</span>
-      <b>${escapeHtml(reward.name)}</b>
-      <div class="reward-mini-cost">${reward.cost}<small>pt</small></div>
+      ${reward.banner ? `<div class="reward-mini-banner"><img src="${escapeHtml(reward.banner)}" alt="${escapeHtml(reward.name)}" loading="lazy" decoding="async"></div>` : ""}
+      <div class="reward-mini-body">
+        <span class="reward-mini-icon">${escapeHtml(reward.icon)}</span>
+        <b>${escapeHtml(reward.name)}</b>
+        <div class="reward-mini-cost">${reward.cost}<small>pt</small></div>
+      </div>
     </article>`;
 }
 
@@ -704,9 +707,12 @@ function renderExchange() {
           const label = !exchangeAvailable ? "受付終了" : (affordable ? "交換する" : `あと${reward.cost - state.points}pt`);
           return `
             <article class="exchange-card ${!exchangeAvailable ? "period-ended" : ""}" style="--tint:${escapeHtml(reward.tint)}">
-              <span class="exchange-icon">${escapeHtml(reward.icon)}</span>
-              <div><div class="exchange-name">${escapeHtml(reward.name)}</div><div class="exchange-cost">${reward.cost}<small>pt</small></div></div>
-              <button class="exchange-button" type="button" data-reward-id="${escapeHtml(reward.id)}" ${enabled ? "" : "disabled"}>${label}</button>
+              ${reward.banner ? `<div class="exchange-banner-wrap"><img class="exchange-banner-image" src="${escapeHtml(reward.banner)}" alt="${escapeHtml(reward.name)}" loading="lazy" decoding="async"></div>` : ""}
+              <div class="exchange-card-body">
+                <span class="exchange-icon">${escapeHtml(reward.icon)}</span>
+                <div><div class="exchange-name">${escapeHtml(reward.name)}</div><div class="exchange-cost">${reward.cost}<small>pt</small></div></div>
+                <button class="exchange-button" type="button" data-reward-id="${escapeHtml(reward.id)}" ${enabled ? "" : "disabled"}>${label}</button>
+              </div>
             </article>`;
         }).join("")}
       </div>
