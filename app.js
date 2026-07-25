@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.25-SERVER-AUTH-01";
+const APP_BUILD = "2026.07.25-SERVER-AUTH-03";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -181,6 +181,7 @@ function applyServerState(nextState, { render = true } = {}) {
   state = normalizeServerState(nextState);
   saveState(); // localStorageは表示用キャッシュ。加算・交換の正本ではありません。
   serverReady = true;
+  setServerStatus("connected", "サーバー同期済み", `アプリ ${APP_BUILD}`);
   if (render) renderAll();
 }
 
@@ -192,6 +193,7 @@ function serverErrorText(result, fallback = "処理を完了できませんで�
 async function syncServerState({ showNotice = false } = {}) {
   if (!GAS_ENABLED || serverSyncing) return false;
   serverSyncing = true;
+  setServerStatus("checking", "サーバー確認中", "ポイント残高を確認しています");
   try {
     const result = await serverJsonp("bootstrap");
     if (!result?.ok || !result.state) throw new Error(serverErrorText(result, "ポイント情報を取得できませんでした。"));
@@ -201,6 +203,7 @@ async function syncServerState({ showNotice = false } = {}) {
   } catch (error) {
     console.error("サーバー同期に失敗しました。", error);
     serverReady = false;
+    setServerStatus("error", "サーバー未接続", "通信状況とGASのデプロイを確認してください");
     renderAll();
     if (showNotice) {
       showMessage(
@@ -346,6 +349,14 @@ let qrExpiryTimer = null;
 let scannerResultLocked = false;
 let serverReady = false;
 let serverSyncing = false;
+
+function setServerStatus(mode, text, detail = "") {
+  const status = document.getElementById("serverStatus");
+  if (!status) return;
+  status.className = `server-status ${mode || ""}`.trim();
+  status.textContent = text;
+  status.title = detail || text;
+}
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -989,9 +1000,20 @@ async function confirmUse() {
     });
     if (result?.state) applyServerState(result.state, { render: false });
     if (!result?.ok) throw new Error(serverErrorText(result, "クーポンを使用済みにできませんでした。"));
+    const serverCoupon = state.coupons.find((item) => item.instanceId === coupon.instanceId);
+    if (!serverCoupon?.used) {
+      throw new Error("サーバー側で使用済み状態を確認できませんでした。ページを再読み込みして、もう一度確認してください。");
+    }
+    sendGasEvent("server_coupon_use_success", {
+      itemId: coupon.couponId,
+      itemName: coupon.name,
+      points: 0,
+      balance: state.points,
+      couponInstanceId: coupon.instanceId
+    });
     closeModal("useModal");
     renderAll();
-    showToast("クーポンを使用済みにしました", "success");
+    showToast("サーバーに使用済みとして記録しました", "success");
     pendingUseId = null;
   } catch (error) {
     console.error("クーポン使用処理に失敗しました。", error);

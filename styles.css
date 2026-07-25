@@ -503,3 +503,12 @@ body.modal-open{overflow:hidden}
 .location-notice-list b{display:block;color:var(--ink);font-size:.73rem}
 .location-notice-list small{display:block;margin-top:3px;color:var(--muted);font-size:.61rem;line-height:1.45}
 .location-confirm-button{background:linear-gradient(135deg,#0876c9,#12a7e8);box-shadow:0 6px 0 #063d78,0 12px 20px rgba(8,118,201,.2)}
+
+
+/* SERVER-03: GAS正本への接続状態を利用者・管理者が確認できる表示 */
+.server-status{position:relative;z-index:3;display:inline-flex;align-items:center;gap:6px;margin:9px auto 0;padding:5px 11px;border-radius:999px;font-size:.72rem;font-weight:800;letter-spacing:.02em;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.9);color:#476476;box-shadow:0 5px 14px rgba(5,76,133,.1)}
+.server-status::before{content:"";width:8px;height:8px;border-radius:50%;background:#f2b134;box-shadow:0 0 0 3px rgba(242,177,52,.15)}
+.server-status.connected{color:#087a58;background:#edfff8;border-color:#bcebd9}
+.server-status.connected::before{background:#16a976;box-shadow:0 0 0 3px rgba(22,169,118,.15)}
+.server-status.error{color:#b52e42;background:#fff2f4;border-color:#f2c1ca}
+.server-status.error::before{background:#e44858;box-shadow:0 0 0 3px rgba(228,72,88,.15)}
