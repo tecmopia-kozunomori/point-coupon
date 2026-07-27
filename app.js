@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.27-SERVER-08-COUNTUP";
+const APP_BUILD = "2026.07.27-SERVER-09-PREMIUM";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -174,6 +174,7 @@ function normalizeServerState(value) {
     points: Number.isFinite(Number(source.points)) ? Math.max(0, Number(source.points)) : 0,
     lastCheckinDate: typeof source.lastCheckinDate === "string" ? source.lastCheckinDate : "",
     coupons: Array.isArray(source.coupons) ? source.coupons.filter(Boolean) : [],
+    exchangeLocks: source.exchangeLocks && typeof source.exchangeLocks === "object" ? source.exchangeLocks : {},
     transactions: Array.isArray(source.transactions) ? source.transactions.filter(Boolean).slice(-100) : []
   };
 }
@@ -336,14 +337,15 @@ const REWARDS = Object.freeze([
   { id: "crane_500_7", name: "クレーンゲーム500円で7PLAY券", cost: 6, icon: "7️⃣", type: "crane", tint: "#e9f6ff", banner: "./images/coupons/coupon_crane_500yen_7play.webp", notice: "対象台に限ります。", noticeDetail: "筐体ガラス面に設置されている案内をご確認ください。" },
   { id: "crane_free3", name: "クレーンゲーム3回無料券", cost: 15, icon: "🏆", type: "crane", tint: "#e5f8ff", banner: "./images/coupons/coupon_crane_free_3play.webp", notice: "対象台に限ります。", noticeDetail: "筐体ガラス面に設置されている案内をご確認ください。" },
   { id: "medal_99", name: "ゲームメダル99枚引換券", cost: 15, icon: "✨", type: "medal", tint: "#fff4ce", banner: "./images/coupons/coupon_medal_99.webp" },
-  { id: "prize_choice", name: "お好きな景品と交換券", cost: 50, icon: "🎁", type: "prize", tint: "#f2eaff", banner: "./images/coupons/coupon_special_prize.webp", notice: "店内在庫があるものに限ります。" },
-  { id: "medal_3333", name: "ゲームメダル3,333枚引換券", cost: 50, icon: "👑", type: "medal", tint: "#fff1c2", banner: "./images/coupons/coupon_medal_3333.webp" }
+  { id: "prize_choice", name: "お好きな景品と交換券", cost: 50, icon: "🎁", type: "prize", tint: "#f2eaff", banner: "./images/coupons/coupon_special_prize.webp", premium: true, oneTime: true, notice: "お一人様1回限り。店内在庫があるものに限ります。", noticeDetail: "一度交換すると、使用後も再交換できません。" },
+  { id: "medal_3333", name: "ゲームメダル3,333枚引換券", cost: 50, icon: "👑", type: "medal", tint: "#fff1c2", banner: "./images/coupons/coupon_medal_3333.webp", premium: true }
 ]);
 
 const DEFAULT_STATE = Object.freeze({
   points: 0,
   lastCheckinDate: "",
   coupons: [],
+  exchangeLocks: {},
   transactions: []
 });
 
@@ -385,6 +387,7 @@ function loadState() {
       points: Number.isFinite(Number(saved.points)) ? Math.max(0, Number(saved.points)) : 0,
       lastCheckinDate: typeof saved.lastCheckinDate === "string" ? saved.lastCheckinDate : "",
       coupons: Array.isArray(saved.coupons) ? saved.coupons.filter(Boolean) : [],
+      exchangeLocks: saved.exchangeLocks && typeof saved.exchangeLocks === "object" ? saved.exchangeLocks : {},
       transactions: Array.isArray(saved.transactions) ? saved.transactions.filter(Boolean).slice(-100) : []
     };
   } catch (error) {
@@ -815,6 +818,18 @@ function groupRewards() {
   return [3, 6, 15, 50].map((cost) => ({ cost, rewards: REWARDS.filter((reward) => reward.cost === cost) }));
 }
 
+function hasExchangedReward(rewardId) {
+  return Boolean(state.exchangeLocks?.[rewardId]) || state.coupons.some((coupon) => coupon && coupon.couponId === rewardId);
+}
+
+function isRewardLocked(reward) {
+  return Boolean(reward?.oneTime && hasExchangedReward(reward.id));
+}
+
+function premiumBadgeHtml(extraClass = "") {
+  return `<span class="premium-badge ${escapeHtml(extraClass)}"><span>✦</span> PREMIUM <span>✦</span></span>`;
+}
+
 function renderExchange() {
   const exchangeAvailable = isExchangeUsePeriod();
   $("#exchangeBalance").textContent = state.points.toLocaleString("ja-JP");
@@ -830,19 +845,32 @@ function renderExchange() {
       : `ポイント交換・クーポン利用は${exchangeUseDeadlineText()}でした。`;
   }
 
-  $("#exchangeGroups").innerHTML = groupRewards().map((group) => `
-    <section class="exchange-group">
+  $("#exchangeGroups").innerHTML = groupRewards().map((group) => {
+    const premiumGroup = group.cost === 50;
+    return `
+    <section class="exchange-group ${premiumGroup ? "premium-group" : ""}">
       <div class="exchange-group-title">
         <span>${group.cost}</span>
-        <div><b>${group.cost}ptで交換</b><small>${group.rewards.length}種類から選べます</small></div>
+        <div><b>${group.cost}ptで交換</b><small>${premiumGroup ? "最高ランクのプレミアム特典" : `${group.rewards.length}種類から選べます`}</small></div>
+        ${premiumGroup ? premiumBadgeHtml("group-premium-badge") : ""}
       </div>
       <div class="exchange-card-list">
         ${group.rewards.map((reward) => {
           const affordable = state.points >= reward.cost;
-          const enabled = serverReady && exchangeAvailable && affordable;
-          const label = !serverReady ? "確認中" : (!exchangeAvailable ? "受付終了" : (affordable ? "交換する" : `あと${reward.cost - state.points}pt`));
+          const locked = isRewardLocked(reward);
+          const enabled = serverReady && exchangeAvailable && affordable && !locked;
+          const label = !serverReady
+            ? "確認中"
+            : (!exchangeAvailable
+              ? "受付終了"
+              : (locked
+                ? "交換済み"
+                : (affordable ? "交換する" : `あと${reward.cost - state.points}pt`)));
           return `
-            <article class="exchange-card ${!exchangeAvailable ? "period-ended" : ""}" style="--tint:${escapeHtml(reward.tint)}">
+            <article class="exchange-card ${reward.premium ? "premium-card" : ""} ${reward.oneTime ? "one-time-card" : ""} ${locked ? "one-time-locked" : ""} ${!exchangeAvailable ? "period-ended" : ""}" style="--tint:${escapeHtml(reward.tint)}">
+              ${reward.premium ? '<span class="premium-sheen" aria-hidden="true"></span>' : ""}
+              ${reward.premium ? premiumBadgeHtml("card-premium-badge") : ""}
+              ${locked ? '<span class="one-time-lock-badge">✓ 交換済み・再交換不可</span>' : (reward.oneTime ? '<span class="one-time-limit-badge">1回限り</span>' : "")}
               ${reward.banner ? `<div class="exchange-banner-wrap"><img class="exchange-banner-image" src="${escapeHtml(reward.banner)}" alt="${escapeHtml(reward.name)}" loading="lazy" decoding="async" width="750" height="250"></div>` : ""}
               <div class="exchange-card-body">
                 <span class="exchange-icon">${escapeHtml(reward.icon)}</span>
@@ -856,7 +884,8 @@ function renderExchange() {
             </article>`;
         }).join("")}
       </div>
-    </section>`).join("");
+    </section>`;
+  }).join("");
 
   $$('[data-reward-id]').forEach((button) => {
     button.addEventListener("click", () => openExchangeConfirm(button.dataset.rewardId));
@@ -902,15 +931,29 @@ function openExchangeConfirm(rewardId) {
     return;
   }
   const reward = getReward(rewardId);
-  if (!reward || state.points < reward.cost) return;
+  if (!reward) return;
+  if (isRewardLocked(reward)) {
+    showMessage("交換は1回限りです", "「お好きな景品と交換券」はすでに交換済みです。使用後も再交換はできません。", "🔒");
+    return;
+  }
+  if (state.points < reward.cost) return;
   pendingRewardId = rewardId;
-  $("#exchangePreview").innerHTML = `${reward.banner ? `<div class="modal-coupon-banner-wrap"><img class="modal-coupon-banner" src="${escapeHtml(reward.banner)}" alt="${escapeHtml(reward.name)}" loading="eager" decoding="async" width="750" height="250"></div>` : `<div class="big-icon">${escapeHtml(reward.icon)}</div>`}<b>${escapeHtml(reward.name)}</b><div class="preview-cost">${reward.cost}<small>pt</small></div>${couponNoticeHtml(reward, "modal-condition")}`;
+  const preview = $("#exchangePreview");
+  preview.classList.toggle("premium-preview", Boolean(reward.premium));
+  preview.innerHTML = `${reward.premium ? premiumBadgeHtml("modal-premium-badge") : ""}${reward.banner ? `<div class="modal-coupon-banner-wrap"><img class="modal-coupon-banner" src="${escapeHtml(reward.banner)}" alt="${escapeHtml(reward.name)}" loading="eager" decoding="async" width="750" height="250"></div>` : `<div class="big-icon">${escapeHtml(reward.icon)}</div>`}<b>${escapeHtml(reward.name)}</b><div class="preview-cost">${reward.cost}<small>pt</small></div>${reward.oneTime ? '<div class="modal-one-time-alert"><b>交換はお一人様1回限り</b><span>一度交換すると、使用後も再交換できません。</span></div>' : ""}${couponNoticeHtml(reward, "modal-condition")}`;
   openModal("exchangeModal");
 }
 
 async function confirmExchange() {
   const reward = getReward(pendingRewardId);
   if (!reward) return;
+  if (isRewardLocked(reward)) {
+    closeModal("exchangeModal");
+    pendingRewardId = null;
+    renderExchange();
+    showMessage("交換は1回限りです", "「お好きな景品と交換券」はすでに交換済みです。使用後も再交換はできません。", "🔒");
+    return;
+  }
   if (!serverReady) {
     closeModal("exchangeModal");
     showMessage("ポイント情報を確認できません", "通信状況を確認してページを再読み込みしてください。", "📡");
@@ -1002,7 +1045,10 @@ function renderCoupons() {
         ? '<button class="secondary-button" type="button" disabled>使用期限終了</button>'
         : `<button class="danger-button" type="button" data-use-id="${escapeHtml(coupon.instanceId)}">このクーポンを使用する</button>`);
     return `
-    <article class="owned-coupon ${coupon.used ? "used" : ""} ${expired ? "expired" : ""}" style="--tint:${escapeHtml(coupon.tint || "#e8f8ff")}">
+    <article class="owned-coupon ${Number(coupon.cost) === 50 ? "premium-card" : ""} ${coupon.couponId === "prize_choice" ? "one-time-card" : ""} ${coupon.used ? "used" : ""} ${expired ? "expired" : ""}" style="--tint:${escapeHtml(coupon.tint || "#e8f8ff")}">
+      ${Number(coupon.cost) === 50 ? '<span class="premium-sheen" aria-hidden="true"></span>' : ""}
+      ${Number(coupon.cost) === 50 ? premiumBadgeHtml("coupon-premium-badge") : ""}
+      ${coupon.couponId === "prize_choice" ? '<span class="one-time-coupon-badge">お一人様1回限り</span>' : ""}
       ${banner ? `<div class="coupon-banner-wrap"><img class="coupon-banner-image" src="${escapeHtml(banner)}" alt="${escapeHtml(coupon.name || "クーポン")}" loading="lazy" decoding="async" width="750" height="250"></div>` : ""}
       <span class="coupon-state">${stateLabel}</span>
       <div class="owned-coupon-body">
