@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.27-SERVER-AUTH-04-INAPP";
+const APP_BUILD = "2026.07.27-SERVER-AUTH-06-DASHBOARD";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -192,7 +192,20 @@ function serverErrorText(result, fallback = "処理を完了できませんで�
 }
 
 async function syncServerState({ showNotice = false } = {}) {
-  if (!GAS_ENABLED || serverSyncing) return false;
+  if (serverSyncing) return false;
+  if (!GAS_ENABLED) {
+    serverReady = false;
+    setServerStatus("error", "GAS設定を読み込めません", "タップして再確認してください");
+    renderAll();
+    if (showNotice) {
+      showMessage(
+        "サーバー設定を確認できませんでした",
+        "GASの接続先を読み込めませんでした。ページを再読み込みしてください。改善しない場合は、GitHubにgas-config.jsがアップロードされているか確認してください。",
+        "⚙️"
+      );
+    }
+    return false;
+  }
   serverSyncing = true;
   setServerStatus("checking", "サーバー確認中", "ポイント残高を確認しています");
   try {
@@ -261,8 +274,8 @@ const EARN_ACTIONS = Object.freeze({
   CRANE500: Object.freeze({
     id: "crane500",
     token: "CRANE500",
-    name: "クレーンゲーム500円投入で5pt付与",
-    shortName: "500円投入で5pt",
+    name: "クレーンゲーム500円投入",
+    shortName: "500円投入",
     points: 5,
     icon: "🕹️",
     description: "クレーンゲームに500円投入後、スタッフ提示QRを読み取ります。",
@@ -1623,6 +1636,21 @@ function initEvents() {
     renderAll();
     syncServerState();
   });
+
+  const serverStatus = document.getElementById("serverStatus");
+  if (serverStatus) {
+    serverStatus.setAttribute("role", "button");
+    serverStatus.setAttribute("tabindex", "0");
+    serverStatus.title = "タップしてサーバー接続を再確認";
+    const retryServer = () => syncServerState({ showNotice: true });
+    serverStatus.addEventListener("click", retryServer);
+    serverStatus.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        retryServer();
+      }
+    });
+  }
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
