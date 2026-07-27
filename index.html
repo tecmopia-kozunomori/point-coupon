@@ -7,7 +7,7 @@
   <meta name="color-scheme" content="light">
   <meta name="description" content="テクモピア公津の杜店 デジタルポイントカード">
   <title>TECMOPIA デジタルポイントカード</title>
-  <link rel="stylesheet" href="./styles.css?v=20260727-dashboard06">
+  <link rel="stylesheet" href="./styles.css?v=20260727-effect07">
   <script>
     (() => {
       try {
@@ -37,7 +37,7 @@
     window.TECMOPIA_GAS_URL = String(window.TECMOPIA_GAS_URL || "").trim()
       || "https://script.google.com/macros/s/AKfycbylwS4uf_4lrOgpmmRi3qh8SASnLVwMGIxXe-yO3X1A0mwn2J9psLJheTty0ojumvJ1/exec";
   </script>
-  <script src="./app.js?v=20260727-dashboard06" defer></script>
+  <script src="./app.js?v=20260727-effect07" defer></script>
 </head>
 <body>
   <div class="page-sky" aria-hidden="true">
@@ -82,10 +82,13 @@
           </div>
           <span id="todayLabel" class="date-chip">--/--</span>
         </div>
-        <div class="point-balance">
-          <span id="pointChange" class="point-change" aria-hidden="true">+1</span>
-          <strong id="points" aria-live="polite">0</strong>
+        <div id="pointBalance" class="point-balance">
+          <span id="pointChange" class="point-change" aria-hidden="true">+1pt</span>
+          <span class="point-number-frame">
+            <strong id="points" aria-live="polite">0</strong>
+          </span>
           <span>pt</span>
+          <span class="point-slot-glow" aria-hidden="true"></span>
         </div>
         <div class="next-reward">
           <div class="next-reward-row">
@@ -366,6 +369,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <div style="position:fixed;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:20;font:700 9px/1.2 system-ui;color:rgba(0,74,130,.45);pointer-events:none">BUILD SERVER-06-DASHBOARD</div>
+  <div style="position:fixed;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:20;font:700 9px/1.2 system-ui;color:rgba(0,74,130,.45);pointer-events:none">BUILD SERVER-07-EFFECT</div>
 </body>
 </html>

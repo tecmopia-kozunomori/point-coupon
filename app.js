@@ -515,7 +515,14 @@ function showToast(message, type = "") {
 function showMessage(title, message, icon = "🎉") {
   $("#messageTitle").textContent = title;
   $("#messageText").textContent = message;
-  $("#messageIcon").textContent = icon;
+  const iconEl = $("#messageIcon");
+  iconEl.classList.remove("has-image");
+  if (icon && typeof icon === "object" && icon.image) {
+    iconEl.classList.add("has-image");
+    iconEl.innerHTML = `<img src="${escapeHtml(icon.image)}" alt="${escapeHtml(icon.alt || title)}">`;
+  } else {
+    iconEl.textContent = typeof icon === "string" ? icon : "🎉";
+  }
   openModal("messageModal");
 }
 
@@ -549,23 +556,46 @@ function switchScreen(screenId) {
   document.querySelector(".app-shell")?.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+let pointAnimationFrame = 0;
+let pointAnimationCleanupTimer = 0;
+
 function animatePoints(from, to, label) {
   const pointElement = $("#points");
   const changeElement = $("#pointChange");
-  const duration = 680;
+  const balanceElement = $("#pointBalance");
+  const diff = Number(to) - Number(from);
+  const duration = Math.min(2100, Math.max(1200, 900 + Math.abs(diff) * 110));
   const start = performance.now();
-  changeElement.textContent = label;
+
+  cancelAnimationFrame(pointAnimationFrame);
+  clearTimeout(pointAnimationCleanupTimer);
+
+  balanceElement.classList.remove("gain", "loss", "rolling");
+  void balanceElement.offsetWidth;
+  balanceElement.classList.add(diff >= 0 ? "gain" : "loss", "rolling");
+
+  changeElement.textContent = label.endsWith("pt") ? label : `${label}pt`;
   changeElement.classList.remove("show");
   void changeElement.offsetWidth;
   changeElement.classList.add("show");
 
   function tick(now) {
     const progress = Math.min((now - start) / duration, 1);
-    const eased = 1 - Math.pow(1 - progress, 3);
+    const eased = progress < 0.78
+      ? 0.86 * (1 - Math.pow(1 - (progress / 0.78), 3))
+      : 0.86 + 0.14 * (1 - Math.pow(1 - ((progress - 0.78) / 0.22), 2));
     pointElement.textContent = Math.round(from + (to - from) * eased).toLocaleString("ja-JP");
-    if (progress < 1) requestAnimationFrame(tick);
+    if (progress < 1) {
+      pointAnimationFrame = requestAnimationFrame(tick);
+    } else {
+      pointElement.textContent = Number(to).toLocaleString("ja-JP");
+      pointAnimationCleanupTimer = setTimeout(() => {
+        balanceElement.classList.remove("rolling", "gain", "loss");
+      }, 240);
+    }
   }
-  requestAnimationFrame(tick);
+
+  pointAnimationFrame = requestAnimationFrame(tick);
 }
 
 function addTransaction({ kind, name, points, icon }) {
