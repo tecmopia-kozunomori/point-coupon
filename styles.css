@@ -67,11 +67,11 @@ body.modal-open{overflow:hidden}
 .point-card-top p{margin:4px 0 0;font-size:.82rem;font-weight:900}
 .date-chip{padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.14);font-size:.69rem;font-weight:900}
 .point-balance{position:relative;display:flex;align-items:flex-end;justify-content:center;margin:12px 0 14px;line-height:1;isolation:isolate}
-.point-balance strong{display:block;min-width:1.8ch;font-size:clamp(4rem,19vw,6rem);font-weight:900;letter-spacing:-.05em;text-shadow:0 6px 0 rgba(0,42,83,.25);font-variant-numeric:tabular-nums}
-.point-balance>span:last-child{margin:0 0 9px 8px;font-size:1.15rem;font-weight:900;color:#aaf3f0}
-.point-change{position:absolute;left:50%;top:-2px;z-index:3;padding:7px 13px;border-radius:999px;color:#754e00;background:var(--yellow);font-weight:900;letter-spacing:.04em;opacity:0;transform:translateX(-50%) translateY(8px) scale(.82);box-shadow:0 8px 18px rgba(102,72,0,.25)}
+.point-balance strong{display:block;min-width:2ch;font-size:clamp(4rem,19vw,6rem);font-weight:900;letter-spacing:-.05em;text-align:center;text-shadow:0 6px 0 rgba(0,42,83,.25);font-variant-numeric:tabular-nums;will-change:transform,filter,color}
+.point-unit{margin:0 0 9px 8px;font-size:1.15rem;font-weight:900;color:#aaf3f0}
+.point-change{display:none!important}
 .point-change.show{animation:pointPop 1.4s ease both}
-@keyframes pointPop{0%{opacity:0;transform:translateX(-50%) translateY(10px) scale(.7)}18%,72%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}100%{opacity:0;transform:translateX(-50%) translateY(-18px) scale(.94)}}
+@keyframes pointPop{0%{opacity:0;transform:translateY(10px) scale(.7)}20%,65%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-18px)}}
 .next-reward{padding:12px;border-radius:16px;background:rgba(0,39,76,.25)}
 .next-reward-row{display:flex;justify-content:space-between;gap:12px;font-size:.7rem}.next-reward-row b{font-size:.75rem;color:#fff8bd}
 .progress-track{height:9px;margin-top:9px;padding:2px;border-radius:999px;background:rgba(255,255,255,.15)}
@@ -519,18 +519,22 @@ body.modal-open{overflow:hidden}
 .camera-only-help span{font-size:1.25rem}
 
 
-/* ===== SERVER-07: ポイント演出強化 ===== */
-.point-number-frame{position:relative;display:inline-grid;place-items:center;min-width:3.2ch;padding:0 .08em .04em;border-radius:22px;overflow:hidden}
-.point-slot-glow{position:absolute;inset:10px 18% 14px;z-index:-1;border-radius:24px;opacity:0;background:radial-gradient(circle at 50% 50%, rgba(255,255,255,.3), rgba(255,255,255,0) 70%);transition:opacity .25s}
-.point-balance.rolling .point-slot-glow{opacity:1}
-.point-balance.rolling #points{animation:slotRoll .18s linear infinite;filter:drop-shadow(0 0 14px rgba(255,255,255,.26))}
-.point-balance.gain #points{color:#fff7bf}
-.point-balance.loss #points{color:#ffe9ea}
-.point-balance.gain::after,.point-balance.loss::after{content:"";position:absolute;inset:-4px 4%;border-radius:28px;pointer-events:none;opacity:0}
-.point-balance.gain::after{background:radial-gradient(circle, rgba(255,234,127,.22), rgba(255,234,127,0) 68%);animation:balanceFlash 1.9s ease}
-.point-balance.loss::after{background:radial-gradient(circle, rgba(255,169,169,.16), rgba(255,169,169,0) 68%);animation:balanceFlash 1.6s ease}
-@keyframes slotRoll{0%{transform:translateY(0);filter:blur(0)}25%{transform:translateY(-8px);filter:blur(.2px)}50%{transform:translateY(8px);filter:blur(.7px)}75%{transform:translateY(-6px);filter:blur(.25px)}100%{transform:translateY(0);filter:blur(0)}}
-@keyframes balanceFlash{0%{opacity:0;transform:scale(.92)}18%{opacity:1}100%{opacity:0;transform:scale(1.08)}}
-#messageIcon.has-image{width:min(76vw,300px);height:auto;max-width:300px;padding:0;border-radius:0;background:transparent;box-shadow:none;margin:0 auto 12px}
-#messageIcon.has-image img{display:block;width:100%;height:auto;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(188,27,27,.16))}
-@media (prefers-reduced-motion: reduce){.point-balance.rolling #points{animation:none}.point-balance.gain::after,.point-balance.loss::after{animation:none}}
+/* ===== SERVER-08 累計保有ポイントのカウントアップ／ダウン ===== */
+.point-number-frame{position:relative;display:grid;place-items:center;min-width:3.25ch;padding:0 .08em .04em;border-radius:24px;overflow:hidden}
+.point-number-frame::before{content:"";position:absolute;inset:10% -15%;z-index:-1;border-radius:50%;opacity:0;background:radial-gradient(circle,rgba(255,255,255,.34),rgba(255,255,255,0) 70%)}
+.point-counting-label{position:absolute;left:50%;bottom:-13px;z-index:2;transform:translateX(-50%) translateY(5px);white-space:nowrap;color:#fff8b8;font-size:.62rem;font-weight:900;letter-spacing:.08em;opacity:0}
+.point-balance.counting-up .point-counting-label,.point-balance.counting-down .point-counting-label{animation:countingLabel 1.35s ease both}
+.point-balance.counting-up .point-number-frame::before,.point-balance.counting-down .point-number-frame::before{animation:pointAura 1.15s ease-in-out infinite alternate}
+.point-balance.counting-up #points{color:#fff6a8;animation:cumulativeRoll 280ms linear infinite}
+.point-balance.counting-down #points{color:#ffe0e4;animation:cumulativeRoll 280ms linear infinite reverse}
+.point-balance.counting-done #points{animation:pointStop 520ms cubic-bezier(.2,.9,.22,1.35)}
+@keyframes cumulativeRoll{0%{transform:translateY(0) scale(1);filter:blur(0)}25%{transform:translateY(-5px) scale(1.015);filter:blur(.25px)}50%{transform:translateY(4px) scale(.995);filter:blur(.55px)}75%{transform:translateY(-3px) scale(1.008);filter:blur(.2px)}100%{transform:translateY(0) scale(1);filter:blur(0)}}
+@keyframes pointAura{from{opacity:.25;transform:scale(.88)}to{opacity:1;transform:scale(1.16)}}
+@keyframes countingLabel{0%{opacity:0;transform:translateX(-50%) translateY(7px)}18%,72%{opacity:1;transform:translateX(-50%) translateY(0)}100%{opacity:0;transform:translateX(-50%) translateY(-4px)}}
+@keyframes pointStop{0%{transform:scale(.9)}55%{transform:scale(1.12)}100%{transform:scale(1)}}
+
+/* ポイント獲得完了画面：添付GET.pngをそのまま表示 */
+#messageIcon.has-image{width:min(72vw,255px);height:auto;margin:0 auto 5px;padding:0;border-radius:0;background:transparent;box-shadow:none}
+#messageIcon.has-image img{display:block;width:100%;height:auto;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(160,24,24,.18))}
+.message-modal:has(#messageIcon.has-image){max-width:400px}
+@media(prefers-reduced-motion:reduce){.point-balance.counting-up #points,.point-balance.counting-down #points,.point-balance.counting-done #points,.point-balance.counting-up .point-counting-label,.point-balance.counting-down .point-counting-label{animation:none}}

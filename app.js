@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.27-SERVER-AUTH-06-DASHBOARD";
+const APP_BUILD = "2026.07.27-SERVER-08-COUNTUP";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -515,14 +515,22 @@ function showToast(message, type = "") {
 function showMessage(title, message, icon = "🎉") {
   $("#messageTitle").textContent = title;
   $("#messageText").textContent = message;
-  const iconEl = $("#messageIcon");
-  iconEl.classList.remove("has-image");
+  const iconElement = $("#messageIcon");
+  iconElement.classList.remove("has-image");
+  iconElement.replaceChildren();
+
   if (icon && typeof icon === "object" && icon.image) {
-    iconEl.classList.add("has-image");
-    iconEl.innerHTML = `<img src="${escapeHtml(icon.image)}" alt="${escapeHtml(icon.alt || title)}">`;
+    const image = document.createElement("img");
+    image.src = icon.image;
+    image.alt = icon.alt || title;
+    image.width = 1024;
+    image.height = 1024;
+    iconElement.classList.add("has-image");
+    iconElement.appendChild(image);
   } else {
-    iconEl.textContent = typeof icon === "string" ? icon : "🎉";
+    iconElement.textContent = typeof icon === "string" ? icon : "🎉";
   }
+
   openModal("messageModal");
 }
 
@@ -557,45 +565,59 @@ function switchScreen(screenId) {
 }
 
 let pointAnimationFrame = 0;
-let pointAnimationCleanupTimer = 0;
+let pointAnimationSequence = 0;
 
-function animatePoints(from, to, label) {
+function animatePoints(from, to) {
   const pointElement = $("#points");
-  const changeElement = $("#pointChange");
   const balanceElement = $("#pointBalance");
-  const diff = Number(to) - Number(from);
-  const duration = Math.min(2100, Math.max(1200, 900 + Math.abs(diff) * 110));
-  const start = performance.now();
+  const exchangeBalanceElement = $("#exchangeBalance");
+  const startValue = Number(from) || 0;
+  const endValue = Number(to) || 0;
+  const difference = endValue - startValue;
+  const sequence = ++pointAnimationSequence;
 
   cancelAnimationFrame(pointAnimationFrame);
-  clearTimeout(pointAnimationCleanupTimer);
-
-  balanceElement.classList.remove("gain", "loss", "rolling");
+  balanceElement.classList.remove("counting-up", "counting-down", "counting-done");
   void balanceElement.offsetWidth;
-  balanceElement.classList.add(diff >= 0 ? "gain" : "loss", "rolling");
+  balanceElement.classList.add(difference >= 0 ? "counting-up" : "counting-down");
 
-  changeElement.textContent = label.endsWith("pt") ? label : `${label}pt`;
-  changeElement.classList.remove("show");
-  void changeElement.offsetWidth;
-  changeElement.classList.add("show");
+  // 1ptでも変化がしっかり見え、15pt以上でも長すぎない速度。
+  const duration = Math.min(2600, Math.max(1500, 1350 + Math.abs(difference) * 75));
+  const startedAt = performance.now();
 
-  function tick(now) {
-    const progress = Math.min((now - start) / duration, 1);
-    const eased = progress < 0.78
-      ? 0.86 * (1 - Math.pow(1 - (progress / 0.78), 3))
-      : 0.86 + 0.14 * (1 - Math.pow(1 - ((progress - 0.78) / 0.22), 2));
-    pointElement.textContent = Math.round(from + (to - from) * eased).toLocaleString("ja-JP");
-    if (progress < 1) {
-      pointAnimationFrame = requestAnimationFrame(tick);
-    } else {
-      pointElement.textContent = Number(to).toLocaleString("ja-JP");
-      pointAnimationCleanupTimer = setTimeout(() => {
-        balanceElement.classList.remove("rolling", "gain", "loss");
-      }, 240);
+  return new Promise((resolve) => {
+    function tick(now) {
+      if (sequence !== pointAnimationSequence) {
+        resolve();
+        return;
+      }
+
+      const progress = Math.min((now - startedAt) / duration, 1);
+      // 最初はゆっくり動き出し、途中は回転するように進み、最後はゆっくり停止。
+      const eased = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+      const current = Math.round(startValue + difference * eased);
+      const formatted = current.toLocaleString("ja-JP");
+      pointElement.textContent = formatted;
+      exchangeBalanceElement.textContent = formatted;
+
+      if (progress < 1) {
+        pointAnimationFrame = requestAnimationFrame(tick);
+        return;
+      }
+
+      const finalText = endValue.toLocaleString("ja-JP");
+      pointElement.textContent = finalText;
+      exchangeBalanceElement.textContent = finalText;
+      balanceElement.classList.remove("counting-up", "counting-down");
+      balanceElement.classList.add("counting-done");
+      setTimeout(() => balanceElement.classList.remove("counting-done"), 520);
+      resolve();
     }
-  }
 
-  pointAnimationFrame = requestAnimationFrame(tick);
+    pointAnimationFrame = requestAnimationFrame(tick);
+  });
 }
 
 function addTransaction({ kind, name, points, icon }) {
@@ -917,7 +939,8 @@ async function confirmExchange() {
     }
     closeModal("exchangeModal");
     renderAll(false);
-    animatePoints(before, state.points, `-${reward.cost}`);
+    switchScreen("homeScreen");
+    await animatePoints(before, state.points);
     showToast("クーポンタブに収納しました", "success");
     pendingRewardId = null;
   } catch (error) {
@@ -1589,10 +1612,15 @@ async function claimPoints() {
     }
 
     renderAll(false);
-    animatePoints(before, state.points, `+${Number(result.added || action.points)}`);
     clearPendingEarn();
+    switchScreen("homeScreen");
+    await animatePoints(before, state.points);
     const locationMode = result.locationMode || (accuracy <= FINE_ACCURACY_METERS ? "高精度測位" : "館内測位");
-    showMessage("ポイントGET！", `${action.name}で${Number(result.added || action.points)}ポイント獲得しました。\n${locationMode}：店舗から約${Number(result.distance ?? Math.round(distance))}m・測位精度約${Number(result.accuracy ?? Math.round(accuracy))}mで確認しました。`, "🌊");
+    showMessage(
+      "ポイントGET！",
+      `${action.name}で${Number(result.added || action.points)}ポイント獲得しました。\n${locationMode}：店舗から約${Number(result.distance ?? Math.round(distance))}m・測位精度約${Number(result.accuracy ?? Math.round(accuracy))}mで確認しました。`,
+      { image: "./images/effects/GET.png?v=20260727-effect08", alt: "ポイントGET！" }
+    );
     cleanUrl();
   } catch (error) {
     console.error("位置情報確認に失敗しました。", error);
