@@ -7,7 +7,7 @@
   <meta name="color-scheme" content="light">
   <meta name="description" content="テクモピア公津の杜店 デジタルポイントカード">
   <title>TECMOPIA デジタルポイントカード</title>
-  <link rel="stylesheet" href="./styles.css?v=20260725-server03">
+  <link rel="stylesheet" href="./styles.css?v=20260727-inapp01">
   <script>
     (() => {
       try {
@@ -16,14 +16,14 @@
         if (!token) return;
         const normalized = String(token).toUpperCase();
         const validTokens = ["VISIT1", "CRANE500", "MEDAL1200", "MEDAL2000", "MEDAL3000", "MEDAL5000"];
-        if (validTokens.includes(normalized)) {
-          sessionStorage.setItem("tecmopia_pending_earn_v2", JSON.stringify({
-            token: normalized,
-            expiresAt: Date.now() + 5 * 60 * 1000
-          }));
-        } else {
-          sessionStorage.setItem("tecmopia_invalid_earn_v2", "1");
-        }
+
+        // スマホ標準カメラ等からQRのURLを直接開いた場合は、
+        // ポイント受取権を作らず、アプリ内カメラ利用の案内だけを表示します。
+        sessionStorage.removeItem("tecmopia_pending_earn_v2");
+        sessionStorage.setItem("tecmopia_direct_qr_notice_v1", JSON.stringify({
+          token: validTokens.includes(normalized) ? normalized : "INVALID",
+          at: Date.now()
+        }));
         window.history.replaceState(null, "", `${window.location.pathname}${window.location.hash || ""}`);
       } catch (error) {
         console.warn("QR URLの初期処理に失敗しました。", error);
@@ -32,7 +32,7 @@
   </script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
   <script src="gas-config.js"></script>
-  <script src="./app.js?v=20260725-server03" defer></script>
+  <script src="./app.js?v=20260727-inapp01" defer></script>
 </head>
 <body>
   <div class="page-sky" aria-hidden="true">
@@ -286,10 +286,9 @@
       <div class="scanner-help">
         <span>🔒</span><p>カメラ映像は端末内でQRコードの読み取りにのみ使用します。ポイント加算前に店舗周辺の位置情報を別途確認します。</p>
       </div>
-      <label class="file-scan-button" for="qrImageInput">
-        <span>画像からQRを読み取る</span>
-        <input id="qrImageInput" type="file" accept="image/*" capture="environment">
-      </label>
+      <div class="scanner-help camera-only-help">
+        <span>📷</span><p>画像・スクリーンショットからの読み取りには対応していません。実物のQRコードをカメラで読み取ってください。</p>
+      </div>
       <button id="closeScannerButton" class="secondary-button" type="button">カメラを閉じる</button>
     </section>
   </div>
@@ -353,6 +352,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <div style="position:fixed;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:20;font:700 9px/1.2 system-ui;color:rgba(0,74,130,.45);pointer-events:none">BUILD SERVER-03</div>
+  <div style="position:fixed;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:20;font:700 9px/1.2 system-ui;color:rgba(0,74,130,.45);pointer-events:none">BUILD SERVER-04-INAPP</div>
 </body>
 </html>

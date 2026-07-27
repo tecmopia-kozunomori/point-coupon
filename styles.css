@@ -512,3 +512,8 @@ body.modal-open{overflow:hidden}
 .server-status.connected::before{background:#16a976;box-shadow:0 0 0 3px rgba(22,169,118,.15)}
 .server-status.error{color:#b52e42;background:#fff2f4;border-color:#f2c1ca}
 .server-status.error::before{background:#e44858;box-shadow:0 0 0 3px rgba(228,72,88,.15)}
+
+
+/* SERVER-04: サイト内カメラ限定QR認証 */
+.camera-only-help{border-color:#9ce2c5;background:#effcf6}
+.camera-only-help span{font-size:1.25rem}

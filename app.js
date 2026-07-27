@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.25-SERVER-AUTH-03";
+const APP_BUILD = "2026.07.27-SERVER-AUTH-04-INAPP";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -10,6 +10,7 @@ const DEVICE_SECRET_KEY = "tecmopia_device_secret_v1";
 const RESET_VERSION_KEY = "tecmopia_reset_version_v1";
 const PAGE_VIEW_DATE_KEY = "tecmopia_page_view_date_v1";
 const LOCATION_NOTICE_SESSION_KEY = "tecmopia_location_notice_confirmed_v1";
+const DIRECT_QR_NOTICE_KEY = "tecmopia_direct_qr_notice_v1";
 const GAS_WEB_APP_URL = String(window.TECMOPIA_GAS_URL || "").trim();
 const GAS_PLACEHOLDER = "PASTE_GAS_WEB_APP_URL_HERE";
 const GAS_ENABLED = /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(?:\?.*)?$/i.test(GAS_WEB_APP_URL)
@@ -260,11 +261,11 @@ const EARN_ACTIONS = Object.freeze({
   CRANE500: Object.freeze({
     id: "crane500",
     token: "CRANE500",
-    name: "クレーンゲーム500円・6プレイ",
-    shortName: "500円6プレイ",
+    name: "クレーンゲーム500円投入で5pt付与",
+    shortName: "500円投入で5pt",
     points: 5,
     icon: "🕹️",
-    description: "500円6プレイ利用後、スタッフ提示QRを読み取ります。",
+    description: "クレーンゲームに500円投入後、スタッフ提示QRを読み取ります。",
     oncePerDay: false,
     radiusMeters: 180
   }),
@@ -339,6 +340,7 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 let state = loadState();
 let pendingEarnAction = null;
 let pendingEarnExpiresAt = 0;
+let pendingScanTicket = "";
 let pendingRewardId = null;
 let pendingUseId = null;
 let couponFilter = "active";
@@ -637,7 +639,7 @@ function renderClaimPanel() {
   expiryBox.hidden = true;
   rescanButton.hidden = true;
 
-  if (pendingEarnAction && (!pendingEarnExpiresAt || pendingEarnExpiresAt <= Date.now())) {
+  if (pendingEarnAction && (!pendingScanTicket || !pendingEarnExpiresAt || pendingEarnExpiresAt <= Date.now())) {
     clearPendingEarn();
   }
 
@@ -1057,11 +1059,17 @@ function detectEarnAction() {
   return parseEarnActionFromUrl(url.href) || "invalid";
 }
 
-function savePendingEarn(action, expiresAt = Date.now() + QR_AUTH_VALID_MS) {
+function savePendingEarn(action, scanTicket, expiresAt = Date.now() + QR_AUTH_VALID_MS) {
   pendingEarnAction = action;
   pendingEarnExpiresAt = expiresAt;
+  pendingScanTicket = String(scanTicket || "");
   try {
-    sessionStorage.setItem(QR_SESSION_KEY, JSON.stringify({ token: action.token, expiresAt }));
+    sessionStorage.setItem(QR_SESSION_KEY, JSON.stringify({
+      token: action.token,
+      scanTicket: pendingScanTicket,
+      source: "in_app_camera",
+      expiresAt
+    }));
   } catch (error) {
     console.warn("QR認証情報を一時保存できませんでした。", error);
   }
@@ -1072,12 +1080,15 @@ function restorePendingEarn() {
     const saved = JSON.parse(sessionStorage.getItem(QR_SESSION_KEY));
     const action = actionFromToken(saved?.token);
     const expiresAt = Number(saved?.expiresAt);
-    if (!action || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    const scanTicket = String(saved?.scanTicket || "");
+    const fromInAppCamera = saved?.source === "in_app_camera";
+    if (!action || !fromInAppCamera || !scanTicket || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
       sessionStorage.removeItem(QR_SESSION_KEY);
       return false;
     }
     pendingEarnAction = action;
     pendingEarnExpiresAt = expiresAt;
+    pendingScanTicket = scanTicket;
     return true;
   } catch (error) {
     try { sessionStorage.removeItem(QR_SESSION_KEY); } catch (_) {}
@@ -1088,6 +1099,7 @@ function restorePendingEarn() {
 function clearPendingEarn() {
   pendingEarnAction = null;
   pendingEarnExpiresAt = 0;
+  pendingScanTicket = "";
   try { sessionStorage.removeItem(QR_SESSION_KEY); } catch (error) {}
   stopExpiryTimer();
 }
@@ -1121,35 +1133,49 @@ function startExpiryTimer() {
 }
 
 function processQrAccess() {
+  let directToken = "";
   try {
+    const directNotice = JSON.parse(sessionStorage.getItem(DIRECT_QR_NOTICE_KEY));
+    directToken = String(directNotice?.token || "");
+    sessionStorage.removeItem(DIRECT_QR_NOTICE_KEY);
+
+    // 旧版ページで作られた直接アクセス由来の認証情報も破棄します。
     if (sessionStorage.getItem(QR_INVALID_KEY) === "1") {
       sessionStorage.removeItem(QR_INVALID_KEY);
-      clearPendingEarn();
-      renderAll();
-      showMessage("対象外のQRコードです", "このページ用の正しいポイントQRを読み取ってください。", "⚠️");
-      return;
+      directToken = "INVALID";
     }
-  } catch (error) {}
+  } catch (error) {
+    try { sessionStorage.removeItem(DIRECT_QR_NOTICE_KEY); } catch (_) {}
+  }
+
+  // index.htmlとのキャッシュ不一致時にも、URL直開きは必ず案内だけにします。
   const detected = detectEarnAction();
-  if (detected === "invalid") {
+  if (detected) directToken = detected === "invalid" ? "INVALID" : detected.token;
+
+  if (directToken) {
     clearPendingEarn();
     cleanUrl();
     renderAll();
-    showMessage("対象外のQRコードです", "このページ用の正しいポイントQRを読み取ってください。", "⚠️");
-    return;
-  }
-  if (detected) {
-    savePendingEarn(detected);
-    cleanUrl();
-    renderAll();
     switchScreen("earnScreen");
-    if (detected.oncePerDay && state[detected.dateField] === getTodayKey()) {
-      showMessage("本日は取得済みです", "来店チェックインは1日1回までです。別のポイントQRは読み取れます。", "✅");
-    } else {
-      showToast("QRコードを確認しました", "success");
+    const action = actionFromToken(directToken);
+    if (!action) {
+      showMessage("対象外のQRコードです", "ポイントカード内のカメラから、正しいポイントQRを読み取ってください。", "⚠️");
+      return;
     }
+    sendGasEvent("direct_qr_blocked", {
+      itemId: action.id,
+      itemName: action.name,
+      points: 0,
+      balance: state.points
+    });
+    showMessage(
+      "サイト内カメラから読み取ってください",
+      "このQRコードをスマートフォンの標準カメラから直接開いた場合、ポイントは加算できません。画面の「カメラでQRコードを読み取る」を押して、同じQRコードをもう一度読み取ってください。",
+      "📷"
+    );
     return;
   }
+
   restorePendingEarn();
   renderAll();
   if (pendingEarnAction) switchScreen("earnScreen");
@@ -1169,7 +1195,7 @@ function describeCameraError(error) {
   if (name === "NotFoundError") return "利用できるカメラが見つかりませんでした。";
   if (name === "NotReadableError") return "カメラを使用できません。他のアプリでカメラを使用していないか確認してください。";
   if (!window.isSecureContext && location.hostname !== "localhost") return "カメラを使うにはGitHub PagesのHTTPS URLから開いてください。";
-  return "カメラを起動できませんでした。画像からの読み取りも利用できます。";
+  return "カメラを起動できませんでした。ブラウザのカメラ許可と、他のアプリでカメラを使用していないか確認してください。";
 }
 
 async function stopQrScanner() {
@@ -1188,11 +1214,9 @@ async function closeQrScanner() {
   await stopQrScanner();
   scannerResultLocked = false;
   closeModal("qrScannerModal");
-  const input = $("#qrImageInput");
-  if (input) input.value = "";
 }
 
-function handleDecodedQr(decodedText) {
+async function handleDecodedQr(decodedText) {
   if (scannerResultLocked) return false;
   const action = parseEarnActionFromUrl(decodedText);
   if (!action) {
@@ -1200,29 +1224,61 @@ function handleDecodedQr(decodedText) {
     if (navigator.vibrate) navigator.vibrate(120);
     return false;
   }
+  if (!serverReady) {
+    setScannerStatus("サーバー接続を確認できません。ページを再読み込みしてください", "error");
+    return false;
+  }
+
   scannerResultLocked = true;
   if (qrScannerActive && typeof qrScanner?.pause === "function") {
     try { qrScanner.pause(true); } catch (error) {}
   }
-  savePendingEarn(action);
-  cleanUrl();
-  setScannerStatus(`${action.name}を確認しました`, "success");
-  if (navigator.vibrate) navigator.vibrate([80, 40, 120]);
-  setTimeout(async () => {
-    await closeQrScanner();
-    state = loadState();
-    renderAll();
-    switchScreen("earnScreen");
-    if (action.oncePerDay && state[action.dateField] === getTodayKey()) {
-      showMessage("本日は取得済みです", "来店チェックインは1日1回までです。別のポイントQRは読み取れます。", "✅");
-    } else {
-      showToast("QR認証完了。現在地を確認してください", "success");
+  setScannerStatus("サイト内カメラでの読み取りを確認しています");
+
+  try {
+    const result = await serverJsonp("beginScan", {
+      token: action.token,
+      requestId: makeEventId("scan")
+    });
+    if (!result?.ok || !result.scanTicket) {
+      throw new Error(serverErrorText(result, "QRコードを認証できませんでした。"));
     }
-  }, 420);
-  return true;
+
+    const expiresAt = Number(result.expiresAt) || (Date.now() + QR_AUTH_VALID_MS);
+    savePendingEarn(action, result.scanTicket, expiresAt);
+    cleanUrl();
+    setScannerStatus(`${action.name}を確認しました`, "success");
+    if (navigator.vibrate) navigator.vibrate([80, 40, 120]);
+
+    setTimeout(async () => {
+      await closeQrScanner();
+      state = loadState();
+      renderAll();
+      switchScreen("earnScreen");
+      if (action.oncePerDay && state[action.dateField] === getTodayKey()) {
+        showMessage("本日は取得済みです", "来店チェックインは1日1回までです。別のポイントQRは読み取れます。", "✅");
+      } else {
+        showToast("サイト内カメラ認証完了。現在地を確認してください", "success");
+      }
+    }, 420);
+    return true;
+  } catch (error) {
+    console.error("QR認証に失敗しました。", error);
+    setScannerStatus(error.message || "QRコードを認証できませんでした", "error");
+    scannerResultLocked = false;
+    if (qrScannerActive && typeof qrScanner?.resume === "function") {
+      try { qrScanner.resume(); } catch (resumeError) {}
+    }
+    if (navigator.vibrate) navigator.vibrate(120);
+    return false;
+  }
 }
 
 async function openQrScanner() {
+  if (!serverReady) {
+    showMessage("ポイント情報を確認できません", "通信状況を確認してページを再読み込みしてください。", "📡");
+    return;
+  }
   if (!window.isSecureContext && location.hostname !== "localhost") {
     showMessage("安全な接続が必要です", "カメラを使用するため、GitHub PagesのHTTPS URLから開いてください。", "🔒");
     return;
@@ -1251,24 +1307,6 @@ async function openQrScanner() {
   } catch (error) {
     console.error("カメラの起動に失敗しました。", error);
     setScannerStatus(describeCameraError(error), "error");
-  }
-}
-
-async function scanQrImage(file) {
-  if (!file) return;
-  if (typeof window.Html5Qrcode !== "function") {
-    setScannerStatus("QR読み取り機能を読み込めませんでした", "error");
-    return;
-  }
-  setScannerStatus("画像を確認しています");
-  await stopQrScanner();
-  qrScanner = new Html5Qrcode("qrReader", { verbose: false });
-  try {
-    const decodedText = await qrScanner.scanFile(file, true);
-    handleDecodedQr(decodedText);
-  } catch (error) {
-    console.error("画像QRの読み取りに失敗しました。", error);
-    setScannerStatus("画像からQRコードを読み取れませんでした", "error");
   }
 }
 
@@ -1394,6 +1432,12 @@ async function claimPoints() {
     openQrScanner();
     return;
   }
+  if (!pendingScanTicket) {
+    clearPendingEarn();
+    renderAll();
+    showMessage("QR認証を確認できません", "ポイントカード内のカメラからQRコードをもう一度読み取ってください。", "📷");
+    return;
+  }
   if (!isBusinessHours()) {
     renderAll();
     showMessage(
@@ -1482,6 +1526,7 @@ async function claimPoints() {
     const before = state.points;
     const result = await serverJsonp("claim", {
       token: action.token,
+      scanTicket: pendingScanTicket,
       latitude,
       longitude,
       accuracy,
@@ -1544,7 +1589,6 @@ function initEvents() {
   $("#confirmLocationButton").addEventListener("click", confirmLocationNotice);
   $("#rescanButton").addEventListener("click", rescanQr);
   $("#closeScannerButton").addEventListener("click", closeQrScanner);
-  $("#qrImageInput").addEventListener("change", (event) => scanQrImage(event.target.files?.[0]));
   $("#confirmExchangeButton").addEventListener("click", confirmExchange);
   $("#confirmUseButton").addEventListener("click", confirmUse);
 
