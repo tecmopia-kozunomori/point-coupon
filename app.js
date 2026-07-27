@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.27-SERVER-09-PREMIUM";
+const APP_BUILD = "2026.07.27-SERVER-10-PREMIUM-LAYOUT";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -850,8 +850,8 @@ function renderExchange() {
     return `
     <section class="exchange-group ${premiumGroup ? "premium-group" : ""}">
       <div class="exchange-group-title">
-        <span>${group.cost}</span>
-        <div><b>${group.cost}ptで交換</b><small>${premiumGroup ? "最高ランクのプレミアム特典" : `${group.rewards.length}種類から選べます`}</small></div>
+        <span class="exchange-cost-badge">${group.cost}</span>
+        <div class="exchange-group-copy"><b>${group.cost}ptで交換</b><small>${premiumGroup ? "最高ランクのプレミアム特典" : `${group.rewards.length}種類から選べます`}</small></div>
         ${premiumGroup ? premiumBadgeHtml("group-premium-badge") : ""}
       </div>
       <div class="exchange-card-list">
