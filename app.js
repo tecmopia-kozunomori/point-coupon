@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.27-SERVER-10-PREMIUM-LAYOUT";
+const APP_BUILD = "2026.07.31-SERVER-11-DATE-FIX";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -435,7 +435,7 @@ function getTodayKey() {
 
 const BUSINESS_HOURS = Object.freeze({ startHour: 10, endHour: 20 });
 const CAMPAIGN_DATES = Object.freeze({
-  earnEnd: "2026-09-20",
+  earnEnd: "2026-08-31",
   exchangeUseEnd: "2026-09-30"
 });
 
