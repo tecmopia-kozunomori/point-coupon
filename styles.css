@@ -575,3 +575,23 @@ body.modal-open{overflow:hidden}
 /* SERVER-10: プレミアム見出しの重複防止 */
 .exchange-group-title .premium-badge,.exchange-group-title .premium-badge>span{width:auto;height:auto;border-radius:0;background:none;box-shadow:none;color:inherit}
 .exchange-group-title .premium-badge{border-radius:999px;background:linear-gradient(110deg,#fff7b7,#ffd84a,#ffb936,#fff4a2);box-shadow:0 5px 14px rgba(145,87,0,.2)}
+
+
+/* ===== SERVER-12: 当日未チェックインのお知らせ ===== */
+.checkin-reminder-backdrop{background:rgba(1,35,66,.76)}
+.checkin-reminder-modal{position:relative;overflow:hidden;max-width:390px;padding:24px 19px 19px;background:linear-gradient(155deg,#fff 0%,#f1fbff 68%,#e1f7ff 100%);border:2px solid #8fe4f4}
+.checkin-reminder-modal::before{content:"";position:absolute;width:190px;height:190px;right:-100px;top:-105px;border-radius:50%;background:rgba(53,211,208,.2);box-shadow:0 0 0 20px rgba(53,211,208,.07)}
+.checkin-reminder-modal>*{position:relative;z-index:1}
+.checkin-reminder-kicker{color:#fff;background:linear-gradient(135deg,#0876c9,#12a7e8);box-shadow:0 5px 12px rgba(8,118,201,.22)}
+.checkin-reminder-visual{width:128px;height:104px;margin:13px auto 8px;display:flex;align-items:flex-end;justify-content:center;gap:3px;color:#fff;border-radius:34px;background:linear-gradient(145deg,#0876c9,#12a7e8);box-shadow:0 11px 0 #063d78,0 17px 30px rgba(5,76,133,.24);transform:rotate(-2deg)}
+.checkin-reminder-visual .checkin-pin{align-self:center;margin-right:2px;font-size:1.55rem;filter:drop-shadow(0 3px 2px rgba(0,0,0,.15))}
+.checkin-reminder-visual strong{font-size:4.2rem;line-height:.95;letter-spacing:-.09em;text-shadow:0 5px 0 rgba(0,42,83,.24)}
+.checkin-reminder-visual b{margin-bottom:14px;font-size:1.15rem;color:#fff7a8}
+.checkin-reminder-modal h2{margin-top:17px;font-size:1.34rem;line-height:1.35;color:#063d78}
+.checkin-reminder-modal>p{margin:10px auto 0;max-width:310px;color:#4e7188;font-size:.78rem;line-height:1.65}
+.checkin-reminder-modal>p strong{color:#e44858;font-size:1.05rem}
+.checkin-reminder-note{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:13px;padding:10px 12px;border:1px solid #bdeaf3;border-radius:15px;background:#fff}
+.checkin-reminder-note>span{font-size:1.35rem}.checkin-reminder-note p{margin:0;text-align:left}.checkin-reminder-note b{display:block;font-size:.72rem;color:#0876c9}.checkin-reminder-note small{display:block;margin-top:2px;color:#688197;font-size:.65rem;font-weight:800}
+.checkin-reminder-primary{background:linear-gradient(135deg,#08a6c3,#35d3d0);box-shadow:0 6px 0 #087b91}
+.checkin-reminder-mute{min-height:38px;border:0;background:transparent;color:#688197;text-decoration:underline;text-underline-offset:3px;font-size:.69rem;font-weight:900;cursor:pointer}
+.checkin-reminder-mute:focus-visible{outline:3px solid rgba(255,216,74,.9);outline-offset:2px;border-radius:8px}

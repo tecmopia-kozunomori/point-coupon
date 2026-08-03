@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.07.31-SERVER-11-DATE-FIX";
+const APP_BUILD = "2026.08.03-SERVER-12-CHECKIN-REMINDER";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -9,6 +9,7 @@ const DEVICE_ID_KEY = "tecmopia_device_id_v1";
 const DEVICE_SECRET_KEY = "tecmopia_device_secret_v1";
 const RESET_VERSION_KEY = "tecmopia_reset_version_v1";
 const PAGE_VIEW_DATE_KEY = "tecmopia_page_view_date_v1";
+const CHECKIN_REMINDER_MUTE_DATE_KEY = "tecmopia_checkin_reminder_mute_date_v1";
 const LOCATION_NOTICE_SESSION_KEY = "tecmopia_location_notice_confirmed_v1";
 const DIRECT_QR_NOTICE_KEY = "tecmopia_direct_qr_notice_v1";
 const GAS_WEB_APP_URL = String(window.TECMOPIA_GAS_URL || "").trim();
@@ -505,6 +506,45 @@ function formatDate(iso) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
+}
+
+function isCheckinReminderMutedToday() {
+  try {
+    return localStorage.getItem(CHECKIN_REMINDER_MUTE_DATE_KEY) === getTodayKey();
+  } catch (error) {
+    return false;
+  }
+}
+
+function muteCheckinReminderToday() {
+  try {
+    localStorage.setItem(CHECKIN_REMINDER_MUTE_DATE_KEY, getTodayKey());
+  } catch (error) {
+    console.warn("チェックイン通知の非表示設定を保存できませんでした。", error);
+  }
+  closeModal("checkinReminderModal");
+}
+
+function shouldShowCheckinReminder() {
+  if (!serverReady) return false;
+  if (!isEarnPeriod()) return false;
+  if (!isBusinessHours()) return false;
+  if (state.lastCheckinDate === getTodayKey()) return false;
+  if (isCheckinReminderMutedToday()) return false;
+  if (pendingEarnAction) return false;
+  if ($(".modal-backdrop.open")) return false;
+  return true;
+}
+
+function maybeShowCheckinReminder() {
+  if (!shouldShowCheckinReminder()) return;
+  openModal("checkinReminderModal");
+}
+
+function startCheckinFromReminder() {
+  closeModal("checkinReminderModal");
+  switchScreen("earnScreen");
+  openQrScanner();
 }
 
 function showToast(message, type = "") {
@@ -1708,6 +1748,8 @@ function initEvents() {
   $("#closeScannerButton").addEventListener("click", closeQrScanner);
   $("#confirmExchangeButton").addEventListener("click", confirmExchange);
   $("#confirmUseButton").addEventListener("click", confirmUse);
+  $("#checkinReminderScanButton").addEventListener("click", startCheckinFromReminder);
+  $("#checkinReminderMuteButton").addEventListener("click", muteCheckinReminderToday);
 
   $$('[data-close-modal]').forEach((button) => button.addEventListener("click", () => closeModal(button.dataset.closeModal)));
   $$(".modal-backdrop").forEach((backdrop) => backdrop.addEventListener("click", (event) => {
@@ -1773,7 +1815,10 @@ async function init() {
   renderAll();
   const synced = await syncServerState({ showNotice: true });
   processQrAccess();
-  if (synced) logDailyPageView();
+  if (synced) {
+    logDailyPageView();
+    window.setTimeout(maybeShowCheckinReminder, 450);
+  }
   setInterval(() => syncServerState(), 2 * 60 * 1000);
 }
 
