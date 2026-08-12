@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.08.12-SERVER-15.1-CHECKIN-POPUP-FIX";
+const APP_BUILD = "2026.08.12-SERVER-15.2-DIRECT-QR-ONBOARDING";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -554,6 +554,7 @@ function shouldShowCheckinReminder() {
   if (state.lastCheckinDate === getTodayKey()) return false;
   if (isCheckinReminderMutedToday()) return false;
   if (pendingEarnAction) return false;
+  if (directQrOnboardingPending) return false;
   if ($(".modal-backdrop.open") || tutorialActive) return false;
   return true;
 }
@@ -571,6 +572,7 @@ function startCheckinFromReminder() {
 
 let tutorialStep = 0;
 let tutorialActive = false;
+let directQrOnboardingPending = false;
 
 const TUTORIAL_STEPS = Object.freeze([
   {
@@ -706,6 +708,31 @@ function maybeShowTutorial() {
   openTutorial();
 }
 
+function continueAfterDirectCheckinNotice() {
+  if (!directQrOnboardingPending) return;
+  if (!serverReady) {
+    directQrOnboardingPending = false;
+    return;
+  }
+  if ($(".modal-backdrop.open") || tutorialActive) {
+    window.setTimeout(continueAfterDirectCheckinNotice, 180);
+    return;
+  }
+
+  directQrOnboardingPending = false;
+
+  // 初めて使う人は、まず操作方法を案内します。
+  // チュートリアルを完了またはスキップすると、closeTutorial() から
+  // 初回3pt／通常1ptのチェックイン案内へ続きます。
+  if (state.points === 0 && !hasCompletedTutorial()) {
+    openTutorial();
+    return;
+  }
+
+  // 既にチュートリアル済みの人には、従来どおりチェックイン案内だけを表示します。
+  maybeShowCheckinReminder();
+}
+
 function showToast(message, type = "") {
   const toast = $("#toast");
   toast.textContent = message;
@@ -753,6 +780,10 @@ function closeModal(id) {
   backdrop.setAttribute("aria-hidden", "true");
   if (!$(".modal-backdrop.open")) document.body.classList.remove("modal-open");
   if (lastFocused instanceof HTMLElement) lastFocused.focus({ preventScroll: true });
+
+  if (id === "messageModal" && directQrOnboardingPending) {
+    window.setTimeout(continueAfterDirectCheckinNotice, 220);
+  }
 }
 
 function switchScreen(screenId) {
@@ -1543,6 +1574,11 @@ function processQrAccess() {
       points: 0,
       balance: state.points
     });
+
+    // 標準カメラから来店チェックインQRを開いた場合は、
+    // この案内を閉じたあとに初回導線へつなげます。
+    directQrOnboardingPending = action.id === "visit";
+
     showMessage(
       "サイト内カメラから読み取ってください",
       "このQRコードをスマートフォンの標準カメラから直接開いた場合、ポイントは加算できません。画面の「カメラでQRコードを読み取る」を押して、同じQRコードをもう一度読み取ってください。",
