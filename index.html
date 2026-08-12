@@ -8,7 +8,7 @@
   <meta name="description" content="テクモピア公津の杜店 デジタルポイントカード">
   <title>TECMOPIA デジタルポイントカード</title>
   <link rel="preload" as="image" href="./images/effects/GET.png?v=20260727-effect08">
-  <link rel="stylesheet" href="./styles.css?v=20260803-reminder14">
+  <link rel="stylesheet" href="./styles.css?v=20260812-tutorial15">
   <script>
     (() => {
       try {
@@ -38,7 +38,7 @@
     window.TECMOPIA_GAS_URL = String(window.TECMOPIA_GAS_URL || "").trim()
       || "https://script.google.com/macros/s/AKfycbylwS4uf_4lrOgpmmRi3qh8SASnLVwMGIxXe-yO3X1A0mwn2J9psLJheTty0ojumvJ1/exec";
   </script>
-  <script src="./app.js?v=20260803-reminder14" defer></script>
+  <script src="./app.js?v=20260812-tutorial15" defer></script>
 </head>
 <body>
   <div class="page-sky" aria-hidden="true">
@@ -98,7 +98,7 @@
           <div class="progress-track" aria-hidden="true"><span id="nextRewardBar"></span></div>
         </div>
         <div class="point-card-footer">
-          <span>来店で1pt</span>
+          <span id="homeCheckinRate">来店で1pt</span>
           <span>遊んで最大15pt</span>
         </div>
       </section>
@@ -107,6 +107,16 @@
         <div class="campaign-period-title"><span>📅</span><b>実施期間のご案内</b></div>
         <div class="campaign-period-row"><span>ポイント受け取り</span><strong>2026年8月31日まで</strong></div>
         <div class="campaign-period-row"><span>ポイント交換・クーポン利用</span><strong>2026年9月30日まで</strong></div>
+      </aside>
+
+      <aside id="checkinBoostBanner" class="checkin-boost-banner" aria-label="初回チェックイン3ポイントキャンペーン" hidden>
+        <span class="checkin-boost-icon" aria-hidden="true">⚡</span>
+        <div>
+          <small>8/12 START BOOST</small>
+          <b id="checkinBoostTitle">初回チェックインは3pt！</b>
+          <p id="checkinBoostText">期間中の最初の無料チェックインだけ3pt。過去にチェックイン済みの方も対象です。</p>
+        </div>
+        <span id="checkinBoostStatus" class="checkin-boost-status">対象</span>
       </aside>
 
       <section id="homeActionBanner" class="action-banner" hidden>
@@ -147,9 +157,9 @@
         <div id="recentHistory" class="history-list"></div>
       </section>
 
-      <aside class="info-callout">
+      <aside class="info-callout tutorial-entry-callout">
         <span>📱</span>
-        <div><b>この端末があなたのポイントカードです</b><p>ポイントとクーポンは、この端末の同じブラウザ内に保存されます。</p></div>
+        <div><b>この端末があなたのポイントカードです</b><p>ポイントとクーポンは、この端末の同じブラウザ内に保存されます。</p><button id="openTutorialButton" class="tutorial-entry-button" type="button">使い方を見る</button></div>
       </aside>
 
       <details class="customer-notice">
@@ -222,7 +232,7 @@
       <details class="guide-details">
         <summary><span>?</span><b>ポイントの受け取り方</b><i>›</i></summary>
         <ol>
-          <li><span>1</span><div><b>対象QRを読み取る</b><p>このページのボタンからカメラを起動するか、スマートフォンの標準カメラでQRコードを読み取ります。</p></div></li>
+          <li><span>1</span><div><b>対象QRを読み取る</b><p>このページの「カメラでQRコードを読み取る」からカメラを起動し、店頭のQRコードを読み取ります。</p></div></li>
           <li><span>2</span><div><b>現在地を確認する</b><p>QR認証後に「現在地を確認して受け取る」を押すと、位置情報の確認が始まります。</p></div></li>
           <li><span>3</span><div><b>ポイント獲得</b><p>来店チェックインのみ1日1回。ゲーム利用・メダル貸出は同じ日でも何度でも加算できます。</p></div></li>
         </ol>
@@ -367,14 +377,32 @@
         <img src="./images/effects/checkin-reminder-point.png" alt="" class="checkin-reminder-image">
       </div>
       <h2 id="checkinReminderTitle">今日のチェックインは<br>お済みですか？</h2>
-      <p>カウンターのチェックインQRコードから、<strong>1pt</strong>を受け取れます。</p>
+      <p>店内のチェックイン用QRコードから、<strong id="checkinReminderPoints">3pt</strong>を受け取れます。</p>
+      <div id="checkinReminderBoostNote" class="checkin-reminder-boost-note">⚡ 期間中の初回チェックインは3pt！ 過去にチェックイン済みの方も対象</div>
       <div class="checkin-reminder-note">
-        <span>⏰</span><p><b>ポイント付与時間</b><small>10:00〜20:00／1日1回</small></p>
+        <span>⏰</span><p><b>ポイント付与時間</b><small id="checkinReminderTiming">10:00〜20:00／1日1回</small></p>
       </div>
       <div class="modal-actions">
         <button id="checkinReminderScanButton" class="primary-button checkin-reminder-primary" type="button">チェックインQRを読み取る</button>
         <button class="secondary-button" type="button" data-close-modal="checkinReminderModal">あとで</button>
         <button id="checkinReminderMuteButton" class="checkin-reminder-mute" type="button">今日はこの表示をしない</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="tutorialBackdrop" class="tutorial-backdrop" aria-hidden="true">
+    <section class="tutorial-panel" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle" tabindex="-1">
+      <div class="tutorial-topline">
+        <span id="tutorialStepLabel" class="tutorial-step-label">STEP 1 / 4</span>
+        <button id="tutorialSkipButton" class="tutorial-skip-button" type="button">スキップ</button>
+      </div>
+      <div id="tutorialIcon" class="tutorial-icon" aria-hidden="true">📷</div>
+      <h2 id="tutorialTitle">まずは「貯める」から</h2>
+      <p id="tutorialText">カメラを許可して店内のポイント用QRコードを読み取ります。QR認証後、ポイント受け取り時に位置情報を許可してください。</p>
+      <div class="tutorial-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <div class="tutorial-actions">
+        <button id="tutorialNextButton" class="primary-button" type="button">次へ</button>
+        <button id="tutorialBackButton" class="tutorial-back-button" type="button" hidden>戻る</button>
       </div>
     </section>
   </div>
@@ -389,6 +417,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <div style="position:fixed;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:20;font:700 9px/1.2 system-ui;color:rgba(0,74,130,.45);pointer-events:none">BUILD SERVER-12-CHECKIN-REMINDER</div>
+  <div style="position:fixed;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:20;font:700 9px/1.2 system-ui;color:rgba(0,74,130,.45);pointer-events:none">BUILD SERVER-15-TUTORIAL-BOOST</div>
 </body>
 </html>

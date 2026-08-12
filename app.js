@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.08.03-SERVER-12-CHECKIN-REMINDER";
+const APP_BUILD = "2026.08.12-SERVER-15-TUTORIAL-BOOST";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -10,6 +10,7 @@ const DEVICE_SECRET_KEY = "tecmopia_device_secret_v1";
 const RESET_VERSION_KEY = "tecmopia_reset_version_v1";
 const PAGE_VIEW_DATE_KEY = "tecmopia_page_view_date_v1";
 const CHECKIN_REMINDER_MUTE_DATE_KEY = "tecmopia_checkin_reminder_mute_date_v1";
+const TUTORIAL_DONE_KEY = "tecmopia_tutorial_done_v1";
 const LOCATION_NOTICE_SESSION_KEY = "tecmopia_location_notice_confirmed_v1";
 const DIRECT_QR_NOTICE_KEY = "tecmopia_direct_qr_notice_v1";
 const GAS_WEB_APP_URL = String(window.TECMOPIA_GAS_URL || "").trim();
@@ -176,6 +177,7 @@ function normalizeServerState(value) {
     lastCheckinDate: typeof source.lastCheckinDate === "string" ? source.lastCheckinDate : "",
     coupons: Array.isArray(source.coupons) ? source.coupons.filter(Boolean) : [],
     exchangeLocks: source.exchangeLocks && typeof source.exchangeLocks === "object" ? source.exchangeLocks : {},
+    checkinBoostEligible: Boolean(source.checkinBoostEligible),
     transactions: Array.isArray(source.transactions) ? source.transactions.filter(Boolean).slice(-100) : []
   };
 }
@@ -268,7 +270,7 @@ const EARN_ACTIONS = Object.freeze({
     shortName: "来店チェックイン",
     points: 1,
     icon: "📍",
-    description: "店頭QRを読み取り、店舗周辺で現在地を確認します。",
+    description: "店内のポイント用QRコードを読み取り、店舗周辺で現在地を確認します。",
     oncePerDay: true,
     dateField: "lastCheckinDate",
     radiusMeters: 250
@@ -347,6 +349,7 @@ const DEFAULT_STATE = Object.freeze({
   lastCheckinDate: "",
   coupons: [],
   exchangeLocks: {},
+  checkinBoostEligible: false,
   transactions: []
 });
 
@@ -389,6 +392,7 @@ function loadState() {
       lastCheckinDate: typeof saved.lastCheckinDate === "string" ? saved.lastCheckinDate : "",
       coupons: Array.isArray(saved.coupons) ? saved.coupons.filter(Boolean) : [],
       exchangeLocks: saved.exchangeLocks && typeof saved.exchangeLocks === "object" ? saved.exchangeLocks : {},
+      checkinBoostEligible: Boolean(saved.checkinBoostEligible),
       transactions: Array.isArray(saved.transactions) ? saved.transactions.filter(Boolean).slice(-100) : []
     };
   } catch (error) {
@@ -436,6 +440,8 @@ function getTodayKey() {
 
 const BUSINESS_HOURS = Object.freeze({ startHour: 10, endHour: 20 });
 const CAMPAIGN_DATES = Object.freeze({
+  checkinBoostStart: "2026-08-12",
+  checkinBoostEnd: "2026-08-31",
   earnEnd: "2026-08-31",
   exchangeUseEnd: "2026-09-30"
 });
@@ -476,6 +482,22 @@ function isEarnPeriod(date = new Date()) {
 
 function isExchangeUsePeriod(date = new Date()) {
   return getJapanDateKey(date) <= CAMPAIGN_DATES.exchangeUseEnd;
+}
+
+function isCheckinBoostPeriod() {
+  const today = getTodayKey();
+  return today >= CAMPAIGN_DATES.checkinBoostStart && today <= CAMPAIGN_DATES.checkinBoostEnd;
+}
+
+function currentCheckinPoints() {
+  return isCheckinBoostPeriod() && state.checkinBoostEligible ? 3 : 1;
+}
+
+function pendingEarnDisplayPoints(action) {
+  if (!action) return 0;
+  if (action.id !== "visit" || !isCheckinBoostPeriod() || !state.checkinBoostEligible) return action.points;
+  if (state.lastCheckinDate === getTodayKey()) return Math.max(0, 3 - action.points);
+  return 3;
 }
 
 function formatCampaignDate(dateKey) {
@@ -532,7 +554,7 @@ function shouldShowCheckinReminder() {
   if (state.lastCheckinDate === getTodayKey()) return false;
   if (isCheckinReminderMutedToday()) return false;
   if (pendingEarnAction) return false;
-  if ($(".modal-backdrop.open")) return false;
+  if ($(".modal-backdrop.open") || tutorialActive) return false;
   return true;
 }
 
@@ -545,6 +567,143 @@ function startCheckinFromReminder() {
   closeModal("checkinReminderModal");
   switchScreen("earnScreen");
   openQrScanner();
+}
+
+let tutorialStep = 0;
+let tutorialActive = false;
+
+const TUTORIAL_STEPS = Object.freeze([
+  {
+    screen: "homeScreen",
+    target: '.nav-button[data-screen="earnScreen"]',
+    icon: "📷",
+    title: "まずは「貯める」から",
+    text: "ここからカメラを許可して店内のポイント用QRコードを読み取ります。QR認証後、ポイントを受け取る時に位置情報を許可してください。",
+    next: "貯め方を見る"
+  },
+  {
+    screen: "earnScreen",
+    target: ".guide-details",
+    icon: "💡",
+    title: "貯め方はここで確認",
+    text: "チェックイン・クレーンゲーム・メダル貸出など、ポイントの受け取り方をここからいつでも確認できます。",
+    next: "交換先を見る",
+    openGuide: true
+  },
+  {
+    screen: "exchangeScreen",
+    target: '.nav-button[data-screen="exchangeScreen"]',
+    icon: "🎁",
+    title: "ポイントの交換先はこちら",
+    text: "貯めたポイントはここから特典に交換できます。交換するとクーポンタブへ自動で入ります。",
+    next: "クーポンを見る"
+  },
+  {
+    screen: "couponScreen",
+    target: '.nav-button[data-screen="couponScreen"]',
+    icon: "🎫",
+    title: "使う時は「クーポン」",
+    text: "交換したクーポンはここにあります。使用する時はスタッフに画面を見せてから使用ボタンを押してください。",
+    next: "はじめる"
+  }
+]);
+
+function hasCompletedTutorial() {
+  try {
+    return localStorage.getItem(TUTORIAL_DONE_KEY) === "1";
+  } catch (error) {
+    return false;
+  }
+}
+
+function markTutorialDone() {
+  try {
+    localStorage.setItem(TUTORIAL_DONE_KEY, "1");
+  } catch (error) {
+    console.warn("チュートリアル状態を保存できませんでした。", error);
+  }
+}
+
+function clearTutorialFocus() {
+  $$(".tutorial-focus").forEach((element) => element.classList.remove("tutorial-focus"));
+}
+
+function renderTutorialStep() {
+  const step = TUTORIAL_STEPS[tutorialStep];
+  if (!step) return;
+  clearTutorialFocus();
+  switchScreen(step.screen);
+  if (step.openGuide) {
+    const guide = $(".guide-details");
+    if (guide) guide.open = true;
+  }
+  $("#tutorialStepLabel").textContent = `STEP ${tutorialStep + 1} / ${TUTORIAL_STEPS.length}`;
+  $("#tutorialIcon").textContent = step.icon;
+  $("#tutorialTitle").textContent = step.title;
+  $("#tutorialText").textContent = step.text;
+  $("#tutorialNextButton").textContent = step.next;
+  $("#tutorialBackButton").hidden = tutorialStep === 0;
+  $$(".tutorial-dots span").forEach((dot, index) => dot.classList.toggle("active", index === tutorialStep));
+
+  requestAnimationFrame(() => {
+    const target = $(step.target);
+    if (!target) return;
+    target.classList.add("tutorial-focus");
+    if (!target.closest(".bottom-nav")) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  });
+}
+
+function openTutorial({ manual = false } = {}) {
+  if (tutorialActive) return;
+  if (!manual && (hasCompletedTutorial() || state.points !== 0 || pendingEarnAction || $(".modal-backdrop.open"))) return;
+  tutorialActive = true;
+  tutorialStep = 0;
+  const backdrop = $("#tutorialBackdrop");
+  if (!backdrop) return;
+  backdrop.classList.add("open");
+  backdrop.setAttribute("aria-hidden", "false");
+  document.body.classList.add("tutorial-open");
+  renderTutorialStep();
+  requestAnimationFrame(() => backdrop.querySelector(".tutorial-panel")?.focus());
+}
+
+function closeTutorial({ completed = true } = {}) {
+  if (completed) markTutorialDone();
+  tutorialActive = false;
+  clearTutorialFocus();
+  const backdrop = $("#tutorialBackdrop");
+  if (backdrop) {
+    backdrop.classList.remove("open");
+    backdrop.setAttribute("aria-hidden", "true");
+  }
+  document.body.classList.remove("tutorial-open");
+  switchScreen("homeScreen");
+  window.setTimeout(maybeShowCheckinReminder, 650);
+}
+
+function nextTutorialStep() {
+  if (tutorialStep >= TUTORIAL_STEPS.length - 1) {
+    closeTutorial({ completed: true });
+    return;
+  }
+  tutorialStep += 1;
+  renderTutorialStep();
+}
+
+function previousTutorialStep() {
+  if (tutorialStep <= 0) return;
+  tutorialStep -= 1;
+  renderTutorialStep();
+}
+
+function maybeShowTutorial() {
+  if (!serverReady) return;
+  if (state.points !== 0) return;
+  if (hasCompletedTutorial()) return;
+  if (pendingEarnAction || $(".modal-backdrop.open")) return;
+  openTutorial();
 }
 
 function showToast(message, type = "") {
@@ -723,17 +882,59 @@ function renderHistory() {
 }
 
 function renderEarnRules() {
-  $("#earnRuleList").innerHTML = Object.values(EARN_ACTIONS).map((action) => `
-    <article class="earn-rule">
+  $("#earnRuleList").innerHTML = Object.values(EARN_ACTIONS).map((action) => {
+    const isVisit = action.id === "visit";
+    const sameDayBoostTopUp = isVisit && isCheckinBoostPeriod() && state.checkinBoostEligible && state.lastCheckinDate === getTodayKey();
+    const displayPoints = sameDayBoostTopUp ? 2 : (isVisit ? currentCheckinPoints() : action.points);
+    const description = isVisit && isCheckinBoostPeriod()
+      ? (sameDayBoostTopUp
+          ? "本日すでに通常1ptを受け取っているため、再読取で初回3ptブーストの差額2ptを受け取れます。"
+          : (state.checkinBoostEligible
+              ? "8/12〜8/31の最初のチェックインだけ3pt。受け取り後は通常の1ptに戻ります。"
+              : "初回3ptブースト受け取り済み。以降のチェックインは1日1回1ptです。"))
+      : action.description;
+    const badge = action.oncePerDay
+      ? (sameDayBoostTopUp ? "差額2pt対象" : (state.lastCheckinDate === getTodayKey() ? "本日取得済み" : (isVisit && state.checkinBoostEligible && isCheckinBoostPeriod() ? "初回3pt対象" : "1日1回")))
+      : "同日何度でも";
+    return `
+    <article class="earn-rule ${isVisit && state.checkinBoostEligible && isCheckinBoostPeriod() ? "boost-rule" : ""}">
       <span class="earn-rule-icon">${escapeHtml(action.icon)}</span>
       <div>
         <b>${escapeHtml(action.name)}</b>
-        <p>${escapeHtml(action.description)}</p>
-        <span class="rule-badge">${action.oncePerDay ? (state.lastCheckinDate === getTodayKey() ? "本日取得済み" : "1日1回") : "同日何度でも"}</span>
+        <p>${escapeHtml(description)}</p>
+        <span class="rule-badge">${escapeHtml(badge)}</span>
       </div>
-      <span class="earn-rule-points">${action.points}<small>pt</small></span>
-    </article>`).join("");
+      <span class="earn-rule-points">${displayPoints}<small>pt</small></span>
+    </article>`;
+  }).join("");
 }
+
+function renderCheckinBoost() {
+  const banner = $("#checkinBoostBanner");
+  if (!banner) return;
+  if (!serverReady) {
+    banner.hidden = true;
+    return;
+  }
+  const active = isCheckinBoostPeriod();
+  banner.hidden = !active;
+  if (!active) return;
+  const eligible = state.checkinBoostEligible;
+  banner.classList.toggle("claimed", !eligible);
+  $("#checkinBoostTitle").textContent = eligible ? "初回チェックインは3pt！" : "初回3ptブースト受け取り済み";
+  $("#checkinBoostText").textContent = eligible
+    ? "8/12〜8/31の最初の無料チェックインだけ3pt。過去にチェックイン済みの方も対象です。"
+    : "次回以降の無料チェックインは通常どおり1日1回1ptです。";
+  $("#checkinBoostStatus").textContent = eligible ? "対象" : "受取済";
+
+  const reminderPoints = $("#checkinReminderPoints");
+  const reminderBoostNote = $("#checkinReminderBoostNote");
+  const homeCheckinRate = $("#homeCheckinRate");
+  if (homeCheckinRate) homeCheckinRate.textContent = eligible ? "初回チェックイン3pt" : "来店で1pt";
+  if (reminderPoints) reminderPoints.textContent = `${currentCheckinPoints()}pt`;
+  if (reminderBoostNote) reminderBoostNote.hidden = !eligible;
+}
+
 
 function renderClaimPanel() {
   const panel = $("#claimPanel");
@@ -798,7 +999,11 @@ function renderClaimPanel() {
     return;
   }
 
-  const alreadyClaimed = pendingEarnAction.oncePerDay && state[pendingEarnAction.dateField] === getTodayKey();
+  const boostTopUpAvailable = pendingEarnAction.id === "visit"
+    && isCheckinBoostPeriod()
+    && state.checkinBoostEligible
+    && state.lastCheckinDate === getTodayKey();
+  const alreadyClaimed = pendingEarnAction.oncePerDay && state[pendingEarnAction.dateField] === getTodayKey() && !boostTopUpAvailable;
   if (alreadyClaimed) {
     panel.classList.add("completed");
     $("#claimIcon").textContent = "✅";
@@ -833,14 +1038,15 @@ function renderClaimPanel() {
   }
 
   panel.classList.add("ready");
+  const pendingPoints = pendingEarnDisplayPoints(pendingEarnAction);
   $("#claimIcon").textContent = pendingEarnAction.icon;
-  $("#claimBadge").textContent = pendingEarnAction.oncePerDay ? "来店QR認証済み" : "スタッフQR認証済み";
-  $("#claimTitle").textContent = `${pendingEarnAction.points}ポイント受け取れます`;
-  $("#claimDescription").textContent = pendingEarnAction.name;
+  $("#claimBadge").textContent = boostTopUpAvailable ? "初回3ptブースト差額" : (pendingEarnAction.oncePerDay ? "来店QR認証済み" : "スタッフQR認証済み");
+  $("#claimTitle").textContent = `${pendingPoints}ポイント受け取れます`;
+  $("#claimDescription").textContent = boostTopUpAvailable ? "本日受取済み1ptに、差額2ptを追加します" : pendingEarnAction.name;
   $("#locationProof").hidden = false;
   $("#locationProofText").textContent = `${STORE.name}周辺にいる場合のみ加算`;
   $("#locationPrivacy").hidden = false;
-  claimButton.querySelector(".button-label").textContent = `現在地を確認して${pendingEarnAction.points}pt受け取る`;
+  claimButton.querySelector(".button-label").textContent = `現在地を確認して${pendingPoints}pt受け取る`;
   $("#claimButtonNote").textContent = "ボタンを押すと、位置情報についてのご案内を表示します。QR認証は5分間有効で、測位に失敗しても時間内は再試行できます。";
   claimButton.classList.add("earn-button");
   claimButton.disabled = false;
@@ -850,8 +1056,8 @@ function renderClaimPanel() {
 
   $("#homeActionBanner").hidden = false;
   $("#homeActionIcon").textContent = pendingEarnAction.icon;
-  $("#homeActionTitle").textContent = `${pendingEarnAction.points}ポイント受け取れます`;
-  $("#homeActionText").textContent = pendingEarnAction.name;
+  $("#homeActionTitle").textContent = `${pendingPoints}ポイント受け取れます`;
+  $("#homeActionText").textContent = boostTopUpAvailable ? "初回3ptブーストの差額2pt" : pendingEarnAction.name;
 }
 
 function groupRewards() {
@@ -1702,9 +1908,10 @@ async function claimPoints() {
     switchScreen("homeScreen");
     await animatePoints(before, state.points);
     const locationMode = result.locationMode || (accuracy <= FINE_ACCURACY_METERS ? "高精度測位" : "館内測位");
+    const earnedLabel = result.checkinBoostTopUp ? "初回3ptブーストの差額" : action.name;
     showMessage(
       "ポイントGET！",
-      `${action.name}で${Number(result.added || action.points)}ポイント獲得しました。\n${locationMode}：店舗から約${Number(result.distance ?? Math.round(distance))}m・測位精度約${Number(result.accuracy ?? Math.round(accuracy))}mで確認しました。`,
+      `${earnedLabel}で${Number(result.added || action.points)}ポイント獲得しました。\n${locationMode}：店舗から約${Number(result.distance ?? Math.round(distance))}m・測位精度約${Number(result.accuracy ?? Math.round(accuracy))}mで確認しました。`,
       { image: "./images/effects/GET.png?v=20260727-effect08", alt: "ポイントGET！" }
     );
     cleanUrl();
@@ -1733,6 +1940,7 @@ function renderAll(updatePointText = true) {
   renderHomeRewards();
   renderHistory();
   renderEarnRules();
+  renderCheckinBoost();
   renderClaimPanel();
   renderExchange();
   renderCoupons();
@@ -1750,6 +1958,10 @@ function initEvents() {
   $("#confirmUseButton").addEventListener("click", confirmUse);
   $("#checkinReminderScanButton").addEventListener("click", startCheckinFromReminder);
   $("#checkinReminderMuteButton").addEventListener("click", muteCheckinReminderToday);
+  $("#openTutorialButton")?.addEventListener("click", () => openTutorial({ manual: true }));
+  $("#tutorialNextButton")?.addEventListener("click", nextTutorialStep);
+  $("#tutorialBackButton")?.addEventListener("click", previousTutorialStep);
+  $("#tutorialSkipButton")?.addEventListener("click", () => closeTutorial({ completed: true }));
 
   $$('[data-close-modal]').forEach((button) => button.addEventListener("click", () => closeModal(button.dataset.closeModal)));
   $$(".modal-backdrop").forEach((backdrop) => backdrop.addEventListener("click", (event) => {
@@ -1770,6 +1982,10 @@ function initEvents() {
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
+      if (tutorialActive) {
+        closeTutorial({ completed: true });
+        return;
+      }
       const open = $(".modal-backdrop.open");
       if (open?.id === "qrScannerModal") closeQrScanner();
       else if (open) closeModal(open.id);
@@ -1817,7 +2033,8 @@ async function init() {
   processQrAccess();
   if (synced) {
     logDailyPageView();
-    window.setTimeout(maybeShowCheckinReminder, 450);
+    window.setTimeout(maybeShowTutorial, 320);
+    window.setTimeout(maybeShowCheckinReminder, 900);
   }
   setInterval(() => syncServerState(), 2 * 60 * 1000);
 }
