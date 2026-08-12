@@ -1,6 +1,6 @@
 "use strict";
 
-const APP_BUILD = "2026.08.12-SERVER-15-TUTORIAL-BOOST";
+const APP_BUILD = "2026.08.12-SERVER-15.1-CHECKIN-POPUP-FIX";
 
 const STORAGE_KEY = "tecmopia_point_coupon_v1";
 
@@ -917,22 +917,39 @@ function renderCheckinBoost() {
     return;
   }
   const active = isCheckinBoostPeriod();
+  const eligible = active && state.checkinBoostEligible;
   banner.hidden = !active;
-  if (!active) return;
-  const eligible = state.checkinBoostEligible;
-  banner.classList.toggle("claimed", !eligible);
-  $("#checkinBoostTitle").textContent = eligible ? "初回チェックインは3pt！" : "初回3ptブースト受け取り済み";
-  $("#checkinBoostText").textContent = eligible
-    ? "8/12〜8/31の最初の無料チェックインだけ3pt。過去にチェックイン済みの方も対象です。"
-    : "次回以降の無料チェックインは通常どおり1日1回1ptです。";
-  $("#checkinBoostStatus").textContent = eligible ? "対象" : "受取済";
+  if (active) {
+    banner.classList.toggle("claimed", !eligible);
+    $("#checkinBoostTitle").textContent = eligible ? "初回チェックインは3pt！" : "初回3ptブースト受け取り済み";
+    $("#checkinBoostText").textContent = eligible
+      ? "8/12〜8/31の最初の無料チェックインだけ3pt。過去にチェックイン済みの方も対象です。"
+      : "次回以降の無料チェックインは通常どおり1日1回1ptです。";
+    $("#checkinBoostStatus").textContent = eligible ? "対象" : "受取済";
+  }
 
-  const reminderPoints = $("#checkinReminderPoints");
+  const reminderKicker = $("#checkinReminderKicker");
+  const reminderTitle = $("#checkinReminderTitle");
+  const reminderText = $("#checkinReminderText");
   const reminderBoostNote = $("#checkinReminderBoostNote");
   const homeCheckinRate = $("#homeCheckinRate");
+
   if (homeCheckinRate) homeCheckinRate.textContent = eligible ? "初回チェックイン3pt" : "来店で1pt";
-  if (reminderPoints) reminderPoints.textContent = `${currentCheckinPoints()}pt`;
-  if (reminderBoostNote) reminderBoostNote.hidden = !eligible;
+
+  if (eligible) {
+    if (reminderKicker) reminderKicker.textContent = "FIRST CHECK-IN BONUS";
+    if (reminderTitle) reminderTitle.innerHTML = "初回限定！無料チェックインで<br>3ptプレゼント！";
+    if (reminderText) reminderText.innerHTML = '店内のチェックイン用QRコードから、<strong id="checkinReminderPoints">3pt</strong>を受け取れます。';
+    if (reminderBoostNote) {
+      reminderBoostNote.textContent = "🎁 3ptですぐにクーポンと引き換えられます！";
+      reminderBoostNote.hidden = false;
+    }
+  } else {
+    if (reminderKicker) reminderKicker.textContent = "DAILY CHECK-IN";
+    if (reminderTitle) reminderTitle.innerHTML = "今日のチェックインは<br>お済みですか？";
+    if (reminderText) reminderText.innerHTML = '店内のチェックイン用QRコードから、<strong id="checkinReminderPoints">1pt</strong>を受け取れます。';
+    if (reminderBoostNote) reminderBoostNote.hidden = true;
+  }
 }
 
 

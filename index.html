@@ -372,13 +372,13 @@
 
   <div id="checkinReminderModal" class="modal-backdrop checkin-reminder-backdrop" aria-hidden="true">
     <section class="modal checkin-reminder-modal" role="dialog" aria-modal="true" aria-labelledby="checkinReminderTitle" tabindex="-1">
-      <span class="modal-kicker checkin-reminder-kicker">DAILY CHECK-IN</span>
+      <span id="checkinReminderKicker" class="modal-kicker checkin-reminder-kicker">DAILY CHECK-IN</span>
       <div class="checkin-reminder-visual" aria-hidden="true">
         <img src="./images/effects/checkin-reminder-point.png" alt="" class="checkin-reminder-image">
       </div>
       <h2 id="checkinReminderTitle">今日のチェックインは<br>お済みですか？</h2>
-      <p>店内のチェックイン用QRコードから、<strong id="checkinReminderPoints">3pt</strong>を受け取れます。</p>
-      <div id="checkinReminderBoostNote" class="checkin-reminder-boost-note">⚡ 期間中の初回チェックインは3pt！ 過去にチェックイン済みの方も対象</div>
+      <p id="checkinReminderText">店内のチェックイン用QRコードから、<strong id="checkinReminderPoints">1pt</strong>を受け取れます。</p>
+      <div id="checkinReminderBoostNote" class="checkin-reminder-boost-note" hidden>🎁 3ptですぐにクーポンと引き換えられます！</div>
       <div class="checkin-reminder-note">
         <span>⏰</span><p><b>ポイント付与時間</b><small id="checkinReminderTiming">10:00〜20:00／1日1回</small></p>
       </div>
@@ -417,6 +417,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <div style="position:fixed;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:20;font:700 9px/1.2 system-ui;color:rgba(0,74,130,.45);pointer-events:none">BUILD SERVER-15-TUTORIAL-BOOST</div>
+  <div style="position:fixed;right:8px;bottom:calc(82px + env(safe-area-inset-bottom));z-index:20;font:700 9px/1.2 system-ui;color:rgba(0,74,130,.45);pointer-events:none">BUILD SERVER-15.1-CHECKIN-POPUP-FIX</div>
 </body>
 </html>
